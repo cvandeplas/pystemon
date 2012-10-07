@@ -6,26 +6,14 @@
 @copyright:  GPLv3
 Feel free to use the code, but please share the changes you've made
 
-Features:
-- flexible design, minimal effort to add another paste* site
-- uses multiple threads per unique site to download the pastes
-- waits a random time (within a range) before downloading the latest pastes, time customizable per site
-- uses random User-Agents if requested
-- uses random Proxies (SOCKS) if requested
-
 To be implemented:
 - FIXME set all the config options in the class variables
 - FIXME validate parsing of config file
 - FIXME use syslog logging
-- FIXME runs as a daemon in background
-- FIXME save files in separate directories depending on the day/week/month. Try to avoid duplicate files
+- TODO runs as a daemon in background
+- TODO save files in separate directories depending on the day/week/month. Try to avoid duplicate files
 - LATER let the user not save the data in the dir, but keep in memory what pastes have been saved to prevent duplicates
-- TODO use random proxies
 
-Python Dependencies
-- BeautifulSoup
-- PyYAML
-- socksipy
 '''
 
 import optparse
@@ -35,6 +23,7 @@ import Queue
 import time
 import urllib2
 from BeautifulSoup import BeautifulSoup
+import socket
 import re
 import os
 import smtplib
@@ -43,6 +32,7 @@ from email.MIMEMultipart import MIMEMultipart
 from email.MIMEBase import MIMEBase
 from email.MIMEText import MIMEText
 from email import Encoders
+socket.setdefaulttimeout(10)  # set a default timeout of 10 seconds to download the page (default = unlimited)
 
 
 class PasteSite():
@@ -293,21 +283,29 @@ def getRandomUserAgent():
     return random.choice(yamlconfig['user-agent']['list'])
 
 
+def getRandomProxy():
+    return random.choice(yamlconfig['proxy']['list'])
+
+
 def downloadUrl(url):
     try:
         # Random Proxy if set in config
         if yamlconfig['proxy']['random']:
-            # FIXME implement random proxy
-            pass
+            proxy = urllib2.ProxyHandler({'http': getRandomProxy()})
+            opener = urllib2.build_opener(proxy)
+        # We need to create an opener if it didn't exist yet
+        if not opener:
+            opener = urllib2.build_opener()
         # Random User-Agent if set in config
         if yamlconfig['user-agent']['random']:
-            headers = {'User-Agent': getRandomUserAgent()}
-            request = urllib2.Request(url, None, headers)
-        else:
-            request = urllib2.Request(url)
-        htmlPage = urllib2.urlopen(request).read()
+            opener.addheaders = [('User-Agent', getRandomUserAgent())]
+        response = opener.open(url)
+        htmlPage = response.read()
         return htmlPage
     except urllib2.HTTPError:
+        # FIXME catch errors and retry with failed downloaded pages
+        # try again with another proxy
+        # after X failed tries, stop using the proxy or download the page
         print "ERROR: HTTP Error ############################# " + url
         return False
 
