@@ -35,8 +35,8 @@ site:
       update-min: 10  
 
 # Configuration section to configure proxies
-# Currently only SOCKS proxies are permitted
-proxy:                # NOT IMPLEMENTED
+# Currently only HTTP proxies are permitted
+proxy:
   random: no
   list:
     - 'http://127.0.0.1:8080'
