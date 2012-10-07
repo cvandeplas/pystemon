@@ -16,24 +16,25 @@ update-max: 30          # a random number will be chosen between these two numbe
 
 # Definition of regular expressions to search for in the pasties
 regex-search:
-  - 'mp3'
-  - 'download'
+  - 'foobar'
+#  - 'mp3'
+#  - 'download'
 
 
 # Configuration section for the paste sites
-sites:                  # NOT IMPLEMENTED
-  - PastebinCom:
-      name: pastebin.com
-      archive-url: 'http://pastebin.com/archive'
-      download-url: 'http://pastebin.com/raw.php?i={0}'
-      update-max: 40    # NOT IMPLEMENTED
-      update-min: 30    # NOT IMPLEMENTED
+site:                  # NOT IMPLEMENTED
+  PastebinCom:
+    name: pastebin.com
+    archive-url: 'http://pastebin.com/archive'
+    download-url: 'http://pastebin.com/raw.php?i={0}'
+    update-max: 40    # NOT IMPLEMENTED
+    update-min: 30    # NOT IMPLEMENTED
 
-  - PastieOrg:
+  PastieOrg:
       name: pastie.org
       archive-url: 'http://pastie.org/pastes'
       download-url: 'http://pastie.org/pastes/{0}/text'
-      update-max: 30
+      update-max: 20
       update-min: 10  
 
 # Configuration section to configure proxies
