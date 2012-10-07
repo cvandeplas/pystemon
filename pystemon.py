@@ -1,25 +1,26 @@
 #!/usr/bin/env python
+# encoding: utf-8
 
 '''
-Copyleft GPLv3 - Christophe Vandeplas - christophe@vandeplas.com
+@author:     Christophe Vandeplas <christophe@vandeplas.com>
+@copyright:  GPLv3
 Feel free to use the code, but please share the changes you've made
 
 Features:
 - flexible design, minimal effort to add another paste* site
 - uses multiple threads per unique site to download the pastes
-- waits a random time (within a range) before downloading the latest pastes
+- waits a random time (within a range) before downloading the latest pastes, time customizable per site
 - uses random User-Agents if requested
 - uses random Proxies (SOCKS) if requested
 
 To be implemented:
+- FIXME set all the config options in the class variables
 - FIXME validate parsing of config file
 - FIXME use syslog logging
 - FIXME runs as a daemon in background
 - FIXME save files in separate directories depending on the day/week/month. Try to avoid duplicate files
 - LATER let the user not save the data in the dir, but keep in memory what pastes have been saved to prevent duplicates
-- TODO use random User Agents
 - TODO use random proxies
-- TODO allow download_wait_times per site (some sites have shorter 'new items' lists than others)
 
 Python Dependencies
 - BeautifulSoup
@@ -33,7 +34,6 @@ import threading
 import Queue
 import time
 import urllib2
-import socks
 from BeautifulSoup import BeautifulSoup
 import re
 import os
@@ -66,7 +66,6 @@ class Pastie():
 
     def fetchPastie(self):
         self.pastie_content = downloadUrl(self.url)
-        # LATER check if download success
         return self.pastie_content
 
     def savePastie(self):
@@ -213,9 +212,10 @@ class ThreadPasties(threading.Thread):
         threading.Thread.__init__(self)
         self.queue = queue
         self.name = queue_name
+        self.kill_received = False
 
     def run(self):
-        while True:
+        while not self.kill_received:
             # grabs pastie from queue
             pastie = self.queue.get()
             pastie_content = pastie.fetchAndProcessPastie()
@@ -234,69 +234,59 @@ class ThreadSites(threading.Thread):
     Instances of these threads are responsible to download the list of the last pastes
     and adding them to the list of pending tasks for individual pastes
     '''
-    def __init__(self, queue):
+    def __init__(self, site_name):
         threading.Thread.__init__(self)
-        self.queue = queue
-        self.name = 'sites'
+        self.site_name = site_name
+        self.kill_received = False
+        class_name = globals()[self.site_name + 'Site']
+        self.site = class_name()
 
     def run(self):
-        while True:
+        while not self.kill_received:
             # grabs site from queue
-            site_name = self.queue.get()
-            class_name = globals()[site_name + 'Site']
-            site = class_name()
-            print "Downloading pasties from {0}".format(site.name)
+            print "Downloading pasties from {0}".format(self.site.name)
             # get the list of last pasties, but reverse it so we first have the old
             # entries and then the new ones
-            for pastie in reversed(site.getLastPasties()):
-                queues[site_name].put(pastie)  # add pastie to queue
+            for pastie in reversed(self.site.getLastPasties()):
+                queues[self.site_name].put(pastie)  # add pastie to queue
 
-            # signals to queue job is done
-            self.queue.task_done()
-            #print "Queue {name} size: {size}".format(size=self.queue.qsize(), name=self.name)
+            sleep_time = random.randint(yamlconfig['site'][self.site_name]['update-min'], yamlconfig['site'][self.site_name]['update-max'])
+            print "Sleeping {name} for {time} seconds".format(name=self.site_name, time=sleep_time)
+            time.sleep(sleep_time)
 
 
 def main():
     global queues
+    global threads
     queues = {}
-    sites = {'PastebinCom', 'PastieOrg'}
+    threads = []
 
-    # build a queue and thread to download the last pasties
-    queues['sites'] = Queue.Queue()
-    t = ThreadSites(queues['sites'])
-    t.setDaemon(True)
-    t.start()
     # spawn a pool of threads per PasteSite, and pass them a queue instance
-    for site in sites:
+    for site in yamlconfig['site']:
         queues[site] = Queue.Queue()
         for i in range(yamlconfig['threads']):
             t = ThreadPasties(queues[site], site)
             t.setDaemon(True)
+            threads.append(t)
             t.start()
 
-    # start downloading the last seens from the sites
+    # build threads to download the last pasties
+    for site in yamlconfig['site']:
+        t = ThreadSites(site)
+        threads.append(t)
+        t.setDaemon(True)
+        t.start()
+
+    # wait while all the threads are running and someone sends CTRL+C
     while True:
         try:
-            for site in sites:
-                queues['sites'].put(site)  # add pastie to queue
-            time.sleep(random.randint(yamlconfig['update-min'], yamlconfig['update-max']))
+            threads = [t.join(1) for t in threads if t is not None and t.isAlive()]
         except KeyboardInterrupt:
             print ''
-            exit(0)  # quit immediately instead of cleaning up
-            break
-
-    # Cleaning up, NOT WORKING  # LATER find a way to get exceptions while waiting for queue.join()
-    try:
-        for queue_name in queues:
-            queues[queue_name].join()
-            print "Terminated {0} queue".format(queue_name)
-        exit(0)
-    except KeyboardInterrupt:
-        # LATER this doesn't seem to be working yet
-        print "################################################"
-        print "# Force Quit invoked by two consecutive CTRL+C #"
-        print "################################################"
-        exit(0)  # This really kills everything
+            print "Ctrl-c received! Sending kill to threads..."
+            for t in threads:
+                t.kill_received = True
+            exit(0)  # quit immediately
 
 
 def getRandomUserAgent():
