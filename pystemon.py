@@ -17,6 +17,8 @@ To be implemented:
 '''
 
 import optparse
+import logging.handlers
+import sys
 import yaml
 import threading
 import Queue
@@ -44,7 +46,7 @@ class PasteSite():
         self.update_min = 10  # TODO set by config file
 
     def getLastPasties(self):
-        print "ERROR: Please implement this function in the child class"
+        logger.error("ERROR: Please implement this function in the child class")
 
 
 class Pastie():
@@ -100,7 +102,7 @@ class Pastie():
 
     def alertOnMatch(self, regex):
         alert = "Found hit for {regex} in pastie {url}".format(regex=regex, url=self.site.download_url.format(self.id))
-        print alert
+        logger.info(alert)
         # Send email alert if configured
         if yamlconfig['email']['alert']:
             self.sendEmailAlert(regex)
@@ -137,7 +139,7 @@ The paste has also been attached to this email.
             s.sendmail(yamlconfig['email']['from'], yamlconfig['email']['to'], msg.as_string())
             s.close()
         except smtplib.SMTPException:
-            print "ERROR: unable to send email"
+            logger.error("unable to send email")
 
 
 class PastebinComSite(PasteSite):
@@ -210,8 +212,8 @@ class ThreadPasties(threading.Thread):
             pastie = self.queue.get()
             pastie_content = pastie.fetchAndProcessPastie()
             if pastie_content:
-                #print "Saved new pastie from {0} with id {1}".format(pb.name, pastie.id)
-                print "Queue {name} size: {size}".format(size=self.queue.qsize(), name=self.name)
+                logger.debug("Saved new pastie from {0} with id {1}".format(self.name, pastie.id))
+                logger.info("Queue {name} size: {size}".format(size=self.queue.qsize(), name=self.name))
             else:
                 # pastie already downloaded OR error ?
                 pass
@@ -234,14 +236,14 @@ class ThreadSites(threading.Thread):
     def run(self):
         while not self.kill_received:
             # grabs site from queue
-            print "Downloading pasties from {0}".format(self.site.name)
+            logger.info("Downloading pasties from {0}".format(self.site.name))
             # get the list of last pasties, but reverse it so we first have the old
             # entries and then the new ones
             for pastie in reversed(self.site.getLastPasties()):
                 queues[self.site_name].put(pastie)  # add pastie to queue
 
             sleep_time = random.randint(yamlconfig['site'][self.site_name]['update-min'], yamlconfig['site'][self.site_name]['update-max'])
-            print "Sleeping {name} for {time} seconds".format(name=self.site_name, time=sleep_time)
+            logger.info("Sleeping {name} for {time} seconds".format(name=self.site_name, time=sleep_time))
             time.sleep(sleep_time)
 
 
@@ -301,8 +303,8 @@ proxies_lock = threading.Lock()
 
 def failedProxy(proxy):
     proxies_failed.append(proxy)
-    if proxies_failed.count(proxy) >= 5 and yamlconfig['proxy']['list'].count(proxy) >=1:
-        print "Removing proxy {0} from proxy list because of to many errors errors.".format(proxy)
+    if proxies_failed.count(proxy) >= 5 and yamlconfig['proxy']['list'].count(proxy) >= 1:
+        logger.info("Removing proxy {0} from proxy list because of to many errors errors.".format(proxy))
         proxies_lock.acquire()
         yamlconfig['proxy']['list'].remove(proxy)
         proxies_lock.release()
@@ -327,19 +329,19 @@ def downloadUrl(url):
         htmlPage = response.read()
         return htmlPage
     except urllib2.HTTPError:
-        print "ERROR: HTTP Error ############################# " + url
+        logger.warn("ERROR: HTTP Error ############################# " + url)
         return None
     except urllib2.URLError:
-        #print "ERROR: URL Error ############################# " + url
+        logger.debug("ERROR: URL Error ############################# " + url)
         if random_proxy:  # remove proxy from the list if needed
             failedProxy(random_proxy)
-            print "Failed to download the page because of proxy error {0} trying again.".format(url)
+            logger.warn("Failed to download the page because of proxy error {0} trying again.".format(url))
             return downloadUrl(url)
     except socket.timeout:
-        #print "ERROR: timeout ############################# " + url
+        logger.debug("ERROR: timeout ############################# " + url)
         if random_proxy:  # remove proxy from the list if needed
             failedProxy(random_proxy)
-            print "Failed to download the page because of proxy error {0} trying again.".format(url)
+            logger.warn("Failed to download the page because of proxy error {0} trying again.".format(url))
             return downloadUrl(url)
     # do NOT try to download the url again here, as we might end in enless loop
 
@@ -349,20 +351,20 @@ def parseConfigFile(configfile):
     try:
         yamlconfig = yaml.load(file(configfile))
     except yaml.YAMLError, exc:
-        print "Error in configuration file:",
+        logger.error("Error in configuration file:")
         if hasattr(exc, 'problem_mark'):
             mark = exc.problem_mark
-            print "error position: (%s:%s)" % (mark.line + 1, mark.column + 1)
+            logger.error("error position: (%s:%s)" % (mark.line + 1, mark.column + 1))
             exit(1)
-        print ''
     # TODO verify validity of config parameters
 
 
 if __name__ == "__main__":
+    global logger
     parser = optparse.OptionParser("usage: %prog [options]")
     parser.add_option("-c", "--config", dest="config",
                       help="load configuration from file", metavar="FILE")
-    parser.add_option("-d", "--daemon", action="store_true",
+    parser.add_option("-d", "--daemon", action="store_true", dest="daemon",
                       help="runs in background as a daemon (NOT IMPLEMENTED)")
     parser.add_option("-s", "--stats", action="store_true", dest="stats",
                       help="display statistics about the running threads (NOT IMPLEMENTED)")
@@ -378,10 +380,20 @@ if __name__ == "__main__":
         if os.path.isfile('pystemon.yaml'):
             options.config = 'pystemon.yaml'
     if not os.path.isfile(options.config):
-        print options.config
         parser.error('Configuration file not found. Please create /etc/pystemon.yaml, pystemon.yaml or specify a config file using the -c option.')
         exit(1)
     parseConfigFile(options.config)
+
+    logger = logging.getLogger('pystemon')
+    logger.setLevel(logging.INFO)
+    logger.addHandler(logging.StreamHandler(sys.stdout))
+    if options.verbose:
+        logger.setLevel(logging.DEBUG)
+
+    if options.daemon:
+        # send logging to syslog if using daemon
+        logger.addHandler(logging.handlers.SysLogHandler(facility=logging.handlers.SysLogHandler.LOG_DAEMON))
+        # FIXME run application in background
 
     # run the software
     main()
