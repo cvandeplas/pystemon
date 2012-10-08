@@ -270,6 +270,7 @@ def main():
     # wait while all the threads are running and someone sends CTRL+C
     while True:
         try:
+            # FIXME rewrite this in multi-line, as it sometimes gives weird behavior when CTRL+C
             threads = [t.join(1) for t in threads if t is not None and t.isAlive()]
         except KeyboardInterrupt:
             print ''
@@ -280,34 +281,67 @@ def main():
 
 
 def getRandomUserAgent():
-    return random.choice(yamlconfig['user-agent']['list'])
+    if yamlconfig['user-agent']['random'] and yamlconfig['user-agent']['list']:
+        return random.choice(yamlconfig['user-agent']['list'])
+    return None
 
 
 def getRandomProxy():
-    return random.choice(yamlconfig['proxy']['list'])
+    proxy = None
+    proxies_lock.acquire()
+    if yamlconfig['proxy']['random'] and yamlconfig['proxy']['list']:
+        proxy = random.choice(yamlconfig['proxy']['list'])
+    proxies_lock.release()
+    return proxy
+
+
+proxies_failed = []
+proxies_lock = threading.Lock()
+
+
+def failedProxy(proxy):
+    proxies_failed.append(proxy)
+    if proxies_failed.count(proxy) >= 5 and yamlconfig['proxy']['list'].count(proxy) >=1:
+        print "Removing proxy {0} from proxy list because of to many errors errors.".format(proxy)
+        proxies_lock.acquire()
+        yamlconfig['proxy']['list'].remove(proxy)
+        proxies_lock.release()
 
 
 def downloadUrl(url):
     try:
+        opener = None
         # Random Proxy if set in config
-        if yamlconfig['proxy']['random']:
-            proxy = urllib2.ProxyHandler({'http': getRandomProxy()})
+        random_proxy = getRandomProxy()
+        if random_proxy:
+            proxy = urllib2.ProxyHandler({'http': random_proxy})
             opener = urllib2.build_opener(proxy)
         # We need to create an opener if it didn't exist yet
         if not opener:
             opener = urllib2.build_opener()
         # Random User-Agent if set in config
-        if yamlconfig['user-agent']['random']:
-            opener.addheaders = [('User-Agent', getRandomUserAgent())]
+        user_agent = getRandomUserAgent()
+        if user_agent:
+            opener.addheaders = [('User-Agent', user_agent)]
         response = opener.open(url)
         htmlPage = response.read()
         return htmlPage
     except urllib2.HTTPError:
-        # FIXME catch errors and retry with failed downloaded pages
-        # try again with another proxy
-        # after X failed tries, stop using the proxy or download the page
         print "ERROR: HTTP Error ############################# " + url
-        return False
+        return None
+    except urllib2.URLError:
+        #print "ERROR: URL Error ############################# " + url
+        if random_proxy:  # remove proxy from the list if needed
+            failedProxy(random_proxy)
+            print "Failed to download the page because of proxy error {0} trying again.".format(url)
+            return downloadUrl(url)
+    except socket.timeout:
+        #print "ERROR: timeout ############################# " + url
+        if random_proxy:  # remove proxy from the list if needed
+            failedProxy(random_proxy)
+            print "Failed to download the page because of proxy error {0} trying again.".format(url)
+            return downloadUrl(url)
+    # do NOT try to download the url again here, as we might end in enless loop
 
 
 def parseConfigFile(configfile):

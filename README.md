@@ -11,15 +11,13 @@ Features:
 - uses multiple threads per unique site to download the pastes
 - waits a random time (within a range) before downloading the latest pastes, time customizable per site
 - uses random User-Agents if requested
-- uses random proxies if requested
+- uses random proxies if requested, and remove if a proxy is unreliable (fails 5 times)
 
 Python Dependencies
 - BeautifulSoup
 - PyYAML
-- socksipy
 
 Default configuration file: /etc/pystemon.yaml or pystemon.yaml in current directory
 
 Limitations:
-- HTTPS pastie sites are NOT supported if proxies are used (because of a limitation of urllib2)
 - Only HTTP proxies are allowed
