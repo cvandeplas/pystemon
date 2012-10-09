@@ -13,6 +13,7 @@ To be implemented:
 - TODO runs as a daemon in background
 - TODO save files in separate directories depending on the day/week/month. Try to avoid duplicate files
 - LATER let the user not save the data in the dir, but keep in memory what pastes have been saved to prevent duplicates
+- LATER implement a unique-queue
 
 '''
 
@@ -272,8 +273,10 @@ def main():
     # wait while all the threads are running and someone sends CTRL+C
     while True:
         try:
-            # FIXME rewrite this in multi-line, as it sometimes gives weird behavior when CTRL+C
-            threads = [t.join(1) for t in threads if t is not None and t.isAlive()]
+            # FIXME rewrite this in multi-line, as it sometimes gives weird behavior when CTRL+C and eats 100% cpu
+            #threads = [t.join(1) for t in threads if t is not None and t.isAlive()]
+            for t in threads:
+                t.join(1)
         except KeyboardInterrupt:
             print ''
             print "Ctrl-c received! Sending kill to threads..."
