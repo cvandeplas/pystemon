@@ -11,11 +11,13 @@ Features:
 - uses multiple threads per unique site to download the pastes
 - waits a random time (within a range) before downloading the latest pastes, time customizable per site
 - uses random User-Agents if requested
-- uses random proxies if requested, and remove if a proxy is unreliable (fails 5 times)
+- uses random proxies if requested
+- removes a proxy if it is unreliable (fails 5 times)
+- use custom download functions for complex pastie sites
 
 Python Dependencies
-- BeautifulSoup
 - PyYAML
+- BeautifulSoup
 
 Default configuration file: /etc/pystemon.yaml or pystemon.yaml in current directory
 

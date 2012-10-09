@@ -14,7 +14,6 @@ To be implemented:
 - TODO save files in separate directories depending on the day/week/month. Try to avoid duplicate files
 - LATER let the user not save the data in the dir, but keep in memory what pastes have been saved to prevent duplicates
 - LATER implement a unique-queue
-
 '''
 
 import optparse
@@ -25,12 +24,13 @@ import threading
 import Queue
 import time
 import urllib2
-from BeautifulSoup import BeautifulSoup
+import urllib
 import socket
 import re
 import os
 import smtplib
 import random
+from BeautifulSoup import BeautifulSoup
 from email.MIMEMultipart import MIMEMultipart
 from email.MIMEBase import MIMEBase
 from email.MIMEText import MIMEText
@@ -38,16 +38,58 @@ from email import Encoders
 socket.setdefaulttimeout(10)  # set a default timeout of 10 seconds to download the page (default = unlimited)
 
 
-class PasteSite():
-    def __init__(self):
-        self.name = 'general'
-        self.download_url = '{0}'
-        self.save_dir = yamlconfig['archive']['dir']
+class PasteSite(threading.Thread):
+    '''
+    Instances of these threads are responsible to download the list of the last pastes
+    and adding them to the list of pending tasks for individual pastes
+    '''
+    def __init__(self, name, download_url, archive_url, archive_regex):
+        threading.Thread.__init__(self)
+        self.kill_received = False
+
+        self.name = name
+        self.download_url = download_url
+        self.archive_url = archive_url
+        self.archive_regex = archive_regex
+        self.save_dir = yamlconfig['archive']['dir'] + os.sep + name
+        if not os.path.exists(self.save_dir):
+            os.makedirs(self.save_dir)
         self.update_max = 30  # TODO set by config file
         self.update_min = 10  # TODO set by config file
+        self.pastie_classname = None
+
+    def run(self):
+        while not self.kill_received:
+            # grabs site from queue
+            logger.info("Downloading pasties from {0}".format(self.name))
+            # get the list of last pasties, but reverse it so we first have the old
+            # entries and then the new ones
+            for pastie in reversed(self.getLastPasties()):
+                queues[self.name].put(pastie)  # add pastie to queue
+            sleep_time = random.randint(self.update_min, self.update_max)
+            logger.info("Sleeping {name} for {time} seconds".format(name=self.name, time=sleep_time))
+            time.sleep(sleep_time)
 
     def getLastPasties(self):
-        logger.error("ERROR: Please implement this function in the child class")
+        # reset the pasties list
+        self.pasties = []
+        # populate queue with data
+        htmlPage, headers = downloadUrl(self.archive_url)
+        if not htmlPage:
+            return False
+        pasties_ids = re.findall(self.archive_regex, htmlPage)
+        if pasties_ids:
+            for pastie_id in pasties_ids:
+                if self.pastie_classname:
+                    class_name = globals()[self.pastie_classname]
+                    pastie = class_name(self, pastie_id)
+                else:
+                    pastie = Pastie(self, pastie_id)
+                self.pasties.append(pastie)
+            logger.debug("Found {amount} pasties for site {site}".format(amount=len(pasties_ids), site=self.name))
+            return self.pasties
+        logger.warn("No last pasties matches for regular expression site:{site} regex:{regex}".format(site=self.name, regex=self.archive_regex))
+        return False
 
 
 class Pastie():
@@ -55,10 +97,10 @@ class Pastie():
         self.site = site
         self.id = pastie_id
         self.pastie_content = None
-        self.url = self.site.download_url.format(self.id)
+        self.url = self.site.download_url.format(id=self.id)
 
     def fetchPastie(self):
-        self.pastie_content = downloadUrl(self.url)
+        self.pastie_content, headers = downloadUrl(self.url)
         return self.pastie_content
 
     def savePastie(self):
@@ -79,7 +121,7 @@ class Pastie():
         if self.pastieAlreadySeen():
             return None
         # download pastie
-        self.pastie_content = self.fetchPastie()
+        self.fetchPastie()
         # save the pastie on the disk
         if self.pastie_content:
             # Save pastie to disk if configured
@@ -90,27 +132,31 @@ class Pastie():
         return self.pastie_content
 
     def searchContent(self):
+        matches = []
         if not self.pastie_content:
             raise SystemExit('BUG: Content not set, cannot search')
             return False
+        # TODO only alert once per pastie
         # search for the regexes in the htmlPage
         for regex in yamlconfig['regex-search']:
             # TODO first compile regex, then search using compiled version
             m = re.search(regex, self.pastie_content)
             if m:
+                matches.append(regex)
                 #print regex
-                self.alertOnMatch(regex)
+        if matches:
+            self.alertOnMatch(matches)
 
-    def alertOnMatch(self, regex):
-        alert = "Found hit for {regex} in pastie {url}".format(regex=regex, url=self.site.download_url.format(self.id))
+    def alertOnMatch(self, matches):
+        alert = "Found hit for {matches} in pastie {url}".format(matches=matches, url=self.url)
         logger.info(alert)
         # Send email alert if configured
         if yamlconfig['email']['alert']:
-            self.sendEmailAlert(regex)
+            self.sendEmailAlert(matches)
 
-    def sendEmailAlert(self, regex):
+    def sendEmailAlert(self, matches):
         msg = MIMEMultipart()
-        alert = "Found hit for {regex} in pastie {url}".format(regex=regex, url=self.site.download_url.format(self.id))
+        alert = "Found hit for {matches} in pastie {url}".format(matches=matches, url=self.url)
         # headers
         msg['Subject'] = yamlconfig['email']['subject'].format(subject=alert)
         msg['From'] = yamlconfig['email']['from']
@@ -121,12 +167,12 @@ I found a hit for a regular expression on one of the pastebin sites.
 
 The site where the paste came from :        {site}
 The original paste was located here:        {url}
-And the regular expression that matched:    {regex}
+And the regular expression that matched:    {matches}
 The paste has also been attached to this email.
 
 # LATER below follows a small exerpt from the paste to give you direct context
 
-        '''.format(site=self.site.name, url=self.url, regex=regex)
+        '''.format(site=self.site.name, url=self.url, matches=matches)
         msg.attach(MIMEText(message))
         # original paste as attachment
         part = MIMEBase('application', "octet-stream")
@@ -143,57 +189,21 @@ The paste has also been attached to this email.
             logger.error("unable to send email")
 
 
-class PastebinComSite(PasteSite):
-    def __init__(self):
-        PasteSite.__init__(self)
-        self.name = 'pastebin.com'
-        self.download_url = 'http://pastebin.com/raw.php?i={0}'
-        self.archive_url = 'http://pastebin.com/archive'
-        self.save_dir = self.save_dir + os.sep + self.name
-        if not os.path.exists(self.save_dir):
-            os.makedirs(self.save_dir)
+class PastiePasteSiteCom(Pastie):
+    def __init__(self, site, pastie_id):
+        Pastie.__init__(self, site, pastie_id)
 
-    def getLastPasties(self):
-        # reset the pasties list
-        self.pasties = []
-        # populate queue with data
-        htmlPage = downloadUrl(self.archive_url)
-        if not htmlPage:
-            return False
-        htmlDom = BeautifulSoup(htmlPage)
-        content_left = htmlDom.find(id='content_left')
-        allLinks = content_left.findAll('a', {'href': True})
-        for link in allLinks:
-            if len(link['href']) == 9:
-                self.pasties.append(Pastie(self, link['href'][1:]))
-        return self.pasties
-
-
-class PastieOrgSite(PasteSite):
-    def __init__(self):
-        PasteSite.__init__(self)
-        self.name = 'pastie.org'
-        self.download_url = 'http://pastie.org/pastes/{0}/text'
-        self.archive_url = 'http://pastie.org/pastes'
-        self.save_dir = self.save_dir + os.sep + self.name
-        self.pasties = []
-        if not os.path.exists(self.save_dir):
-            os.makedirs(self.save_dir)
-
-    def getLastPasties(self):
-        # reset the pasties list
-        self.pasties = []
-        #populate queue with data
-        htmlPage = downloadUrl(self.archive_url)
-        if not htmlPage:
-            return False
-        htmlDom = BeautifulSoup(htmlPage)
-        allLinks = htmlDom.findAll('a', href=re.compile("/pastes/[0-9][0-9]+"))
-        for link in allLinks:
-            paste_id = link['href'].split('/')[-1]
-            if paste_id:
-                self.pasties.append(Pastie(self, paste_id))
-        return self.pasties
+    def fetchPastie(self):
+        validation_form_page, headers = downloadUrl(self.url)
+        htmlDom = BeautifulSoup(validation_form_page)
+        content_left = htmlDom.find(id='full-width')
+        plain_confirm = content_left.find('input')['value']
+        # build a form with plainConfirm = value and the cookie
+        data = urllib.urlencode({'plainConfirm': plain_confirm})
+        url = "http://pastesite.com/plain/{id}".format(id=self.id)
+        cookie = headers.dict['set-cookie']
+        self.pastie_content, headers = downloadUrl(url, data, cookie)
+        return self.pastie_content
 
 
 class ThreadPasties(threading.Thread):
@@ -222,32 +232,6 @@ class ThreadPasties(threading.Thread):
             self.queue.task_done()
 
 
-class ThreadSites(threading.Thread):
-    '''
-    Instances of these threads are responsible to download the list of the last pastes
-    and adding them to the list of pending tasks for individual pastes
-    '''
-    def __init__(self, site_name):
-        threading.Thread.__init__(self)
-        self.site_name = site_name
-        self.kill_received = False
-        class_name = globals()[self.site_name + 'Site']
-        self.site = class_name()
-
-    def run(self):
-        while not self.kill_received:
-            # grabs site from queue
-            logger.info("Downloading pasties from {0}".format(self.site.name))
-            # get the list of last pasties, but reverse it so we first have the old
-            # entries and then the new ones
-            for pastie in reversed(self.site.getLastPasties()):
-                queues[self.site_name].put(pastie)  # add pastie to queue
-
-            sleep_time = random.randint(yamlconfig['site'][self.site_name]['update-min'], yamlconfig['site'][self.site_name]['update-max'])
-            logger.info("Sleeping {name} for {time} seconds".format(name=self.site_name, time=sleep_time))
-            time.sleep(sleep_time)
-
-
 def main():
     global queues
     global threads
@@ -264,8 +248,17 @@ def main():
             t.start()
 
     # build threads to download the last pasties
-    for site in yamlconfig['site']:
-        t = ThreadSites(site)
+    for site_name in yamlconfig['site']:
+        t = PasteSite(site_name,
+                      yamlconfig['site'][site_name]['download-url'],
+                      yamlconfig['site'][site_name]['archive-url'],
+                      yamlconfig['site'][site_name]['archive-regex'])
+        if 'update-min' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['update-min']:
+            t.update_min = yamlconfig['site'][site_name]['update-min']
+        if 'update-max' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['update-max']:
+            t.update_max = yamlconfig['site'][site_name]['update-max']
+        if 'pastie-classname' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['pastie-classname']:
+            t.pastie_classname = yamlconfig['site'][site_name]['pastie-classname']
         threads.append(t)
         t.setDaemon(True)
         t.start()
@@ -313,24 +306,44 @@ def failedProxy(proxy):
         proxies_lock.release()
 
 
-def downloadUrl(url):
+class NoRedirectHandler(urllib2.HTTPRedirectHandler):
+    def http_error_302(self, req, fp, code, msg, headers):
+        infourl = urllib2.addinfourl(fp, headers, req.get_full_url())
+        infourl.status = code
+        infourl.code = code
+        return infourl
+    http_error_301 = http_error_303 = http_error_307 = http_error_302
+
+
+def downloadUrl(url, data=None, cookie=None):
     try:
         opener = None
         # Random Proxy if set in config
         random_proxy = getRandomProxy()
         if random_proxy:
             proxy = urllib2.ProxyHandler({'http': random_proxy})
-            opener = urllib2.build_opener(proxy)
+            opener = urllib2.build_opener(proxy, NoRedirectHandler())
         # We need to create an opener if it didn't exist yet
         if not opener:
-            opener = urllib2.build_opener()
+            opener = urllib2.build_opener(NoRedirectHandler())
         # Random User-Agent if set in config
         user_agent = getRandomUserAgent()
         if user_agent:
             opener.addheaders = [('User-Agent', user_agent)]
-        response = opener.open(url)
+        if cookie:
+            opener.addheaders.append(('Cookie', cookie))
+        logger.debug("Downloading url: {url} with proxy:{proxy} and user-agent:{ua}".format(url=url, proxy=random_proxy, ua=user_agent))
+        if data:
+            response = opener.open(url, data)
+        else:
+            response = opener.open(url)
         htmlPage = response.read()
-        return htmlPage
+        # If we receive a "slow down" message, follow Pastebin recommandation!
+        if 'Please slow down' in htmlPage:
+            logger.warn("Slow down message received. Waiting 5 seconds")
+            time.sleep(5)
+            return downloadUrl(url)
+        return htmlPage, response.headers
     except urllib2.HTTPError:
         logger.warn("ERROR: HTTP Error ############################# " + url)
         return None
@@ -372,7 +385,7 @@ if __name__ == "__main__":
     parser.add_option("-s", "--stats", action="store_true", dest="stats",
                       help="display statistics about the running threads (NOT IMPLEMENTED)")
     parser.add_option("-v", action="store_true", dest="verbose",
-                      help="outputs more information (NOT IMPLEMENTED)")
+                      help="outputs more information")
 
     (options, args) = parser.parse_args()
 
@@ -399,4 +412,13 @@ if __name__ == "__main__":
         # FIXME run application in background
 
     # run the software
+#    site_name = 'pastesite.com'
+#    ps = PasteSite(site_name,
+#                      yamlconfig['site'][site_name]['download-url'],
+#                      yamlconfig['site'][site_name]['archive-url'],
+#                      yamlconfig['site'][site_name]['archive-regex'])
+#    pastie_id = '45389'
+#    p = PastiePasteSiteCom(ps, pastie_id)
+#    p.fetchPastie()
+#    exit()
     main()

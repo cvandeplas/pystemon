@@ -1,4 +1,3 @@
-
 archive:
   save: yes             # NOT fully IMPLEMENTED - keep as yes or you will hit a bug
   dir: "archive"
@@ -10,40 +9,82 @@ email:
   server: 127.0.0.1
   subject: '[pystemon] - {subject}'
 
-
+#####
 # Definition of regular expressions to search for in the pasties
+#
 regex-search:
   - 'foobar'
-#  - 'mp3'
-#  - 'download'
+  - 'mp3'
+  - 'download'
 
+#####
 # Configuration section for the paste sites
+#
 threads: 3              # number of download threads per site
 site:
-  PastebinCom:
-    name: pastebin.com
-    archive-url: 'http://pastebin.com/archive'           # NOT IMPLEMENTED
-    download-url: 'http://pastebin.com/raw.php?i={0}'    # NOT IMPLEMENTED
-    update-max: 40      # every X seconds check for new updates
-    update-min: 30      # a random number will be chosen between these two numbers
+#  example.com:
+#    archive-url:       # the url where the list of last pasties is present 
+#                       # example: 'http://pastebin.com/archive'
+#    archive-regex:     # a regular expression to extract the pastie-id from the page.
+#                       # do not forget the () to extract the pastie-id
+#                       # example: '<a href="/(\w{8})">.+</a></td>'
+#    download-url:      # url for the raw pastie.    
+#                       # Should contain {id} on the place where the ID of the pastie needs to be placed
+#                       # example: 'http://pastebin.com/raw.php?i={id}'
+#    update-max: 40     # every X seconds check for new updates to see if new pasties are available
+#    update-min: 30     # a random number will be chosen between these two numbers
+#    pastie-classname:  # OPTIONAL: The name of a custom Class that inherits from Pastie
+#                       # This is practical for sites that require custom fetchPastie() functions
 
-  PastieOrg:
-      name: pastie.org
-      archive-url: 'http://pastie.org/pastes'            # NOT IMPLEMENTED
-      download-url: 'http://pastie.org/pastes/{0}/text'  # NOT IMPLEMENTED
-      update-max: 20
-      update-min: 10  
+  pastebin.com:
+    archive-url: 'http://pastebin.com/archive'
+    archive-regex: '<a href="/(\w{8})">.+</a></td>'
+    download-url: 'http://pastebin.com/raw.php?i={id}'
+    update-max: 40
+    update-min: 30
 
+  pastie.org:
+    archive-url: 'http://pastie.org/pastes'
+    archive-regex: '<a href="http://pastie.org/pastes/(\d{7})">'
+    download-url: 'http://pastie.org/pastes/{id}/text'
+    update-max: 20
+    update-min: 10
+
+  nopaste.me:
+    archive-url: 'http://nopaste.me/recent' 
+    archive-regex: '<a href="http://nopaste.me/paste/([a-zA-Z0-9]+)">'
+    download-url: 'http://nopaste.me/download/{id}.txt'
+    update-max: 20
+    update-min: 10
+
+  slexy.org:
+    archive-url: 'http://slexy.org/recent' 
+    archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
+    download-url: 'http://slexy.org/raw/{id}'
+    update-max: 20
+    update-min: 10
+
+  pastesite.com:
+    pastie-classname: PastiePasteSiteCom
+    archive-url: 'http://pastesite.com/recent' 
+    archive-regex: '<a href="(\d+)" title="View this Paste'
+    download-url: 'http://pastesite.com/plain/{id}.txt'
+    update-max: 20
+    update-min: 10
+
+#####
 # Configuration section to configure proxies
 # Currently only HTTP proxies are permitted
+#
 proxy:
   random: no
   list:
     - 'http://127.0.0.1:8080'
     - 'http://127.0.0.1:9000'
 
-
+#####
 # Configuration section for User-Agents
+#
 user-agent:
   random: no
   list:
