@@ -12,8 +12,6 @@ To be implemented:
 - FIXME use syslog logging
 - TODO runs as a daemon in background
 - TODO save files in separate directories depending on the day/week/month. Try to avoid duplicate files
-- LATER let the user not save the data in the dir, but keep in memory what pastes have been saved to prevent duplicates
-- LATER implement a unique-queue
 '''
 
 import optparse
@@ -22,6 +20,7 @@ import sys
 import yaml
 import threading
 import Queue
+from collections import deque
 import time
 import urllib2
 import urllib
@@ -57,6 +56,7 @@ class PastieSite(threading.Thread):
         self.update_max = 30  # TODO set by config file
         self.update_min = 10  # TODO set by config file
         self.pastie_classname = None
+        self.seen_pasties = deque('', 1000)  # max number of pasties ids in memory
 
     def run(self):
         while not self.kill_received:
@@ -72,7 +72,7 @@ class PastieSite(threading.Thread):
 
     def getLastPasties(self):
         # reset the pasties list
-        self.pasties = []
+        pasties = []
         # populate queue with data
         htmlPage, headers = downloadUrl(self.archive_url)
         if not htmlPage:
@@ -85,10 +85,27 @@ class PastieSite(threading.Thread):
                     pastie = class_name(self, pastie_id)
                 else:
                     pastie = Pastie(self, pastie_id)
-                self.pasties.append(pastie)
+                pasties.append(pastie)
             logger.debug("Found {amount} pasties for site {site}".format(amount=len(pasties_ids), site=self.name))
-            return self.pasties
+            return pasties
         logger.warn("No last pasties matches for regular expression site:{site} regex:{regex}".format(site=self.name, regex=self.archive_regex))
+        return False
+
+    def seenPastie(self, pastie_id):
+        ''' check if the pastie was already downloaded, and remember that we've seen it '''
+        # first look in memory if we have already seen this pastie
+        if self.seen_pasties.count(pastie_id):
+            return True
+        # look on the filesystem.  # LATER remove this filesystem lookup as it will give problems on long term
+        if yamlconfig['archive']['save']:
+            # check if the pastie was already saved on the disk
+            if os.path.exists(self.save_dir + os.sep + pastie_id):
+                return True
+
+        # we have not yet seen the pastie
+        # keep in memory that we've seen it
+        # appendleft for performance reasons (faster later when we iterate over the deque)
+        self.seen_pasties.appendleft(pastie_id)
         return False
 
 
@@ -109,16 +126,9 @@ class Pastie():
         f = open(self.site.save_dir + os.sep + self.id, 'w')
         f.write(self.pastie_content)  # TODO error checking
 
-    def seenPastie(self):
-        if yamlconfig['archive']['save']:
-            # check if the pastie was already saved on the disk
-            if os.path.exists(self.site.save_dir + os.sep + self.id):
-                return True
-        # TODO check memory-list of recently seen pasties
-
     def fetchAndProcessPastie(self):
-        # check if the pastie was already downloaded
-        if self.seenPastie():
+        # check if the pastie was already downloaded, and remember that we've seen it
+        if self.site.seenPastie(self.id):
             return None
         # download pastie
         self.fetchPastie()
@@ -270,8 +280,6 @@ def main():
     # wait while all the threads are running and someone sends CTRL+C
     while True:
         try:
-            # FIXME rewrite this in multi-line, as it sometimes gives weird behavior when CTRL+C and eats 100% cpu
-            #threads = [t.join(1) for t in threads if t is not None and t.isAlive()]
             for t in threads:
                 t.join(1)
         except KeyboardInterrupt:
@@ -311,6 +319,10 @@ def failedProxy(proxy):
 
 
 class NoRedirectHandler(urllib2.HTTPRedirectHandler):
+    '''
+    This class is only necessary to not follow HTTP redirects in webpages.
+    It is used by the downloadUrl() function
+    '''
     def http_error_302(self, req, fp, code, msg, headers):
         infourl = urllib2.addinfourl(fp, headers, req.get_full_url())
         infourl.status = code
@@ -342,7 +354,7 @@ def downloadUrl(url, data=None, cookie=None):
         else:
             response = opener.open(url)
         htmlPage = response.read()
-        # If we receive a "slow down" message, follow Pastebin recommandation!
+        # If we receive a "slow down" message, follow Pastebin recommendation!
         if 'Please slow down' in htmlPage:
             logger.warn("Slow down message received. Waiting 5 seconds")
             time.sleep(5)
@@ -416,13 +428,4 @@ if __name__ == "__main__":
         # FIXME run application in background
 
     # run the software
-#    site_name = 'pastesite.com'
-#    ps = PastieSite(site_name,
-#                      yamlconfig['site'][site_name]['download-url'],
-#                      yamlconfig['site'][site_name]['archive-url'],
-#                      yamlconfig['site'][site_name]['archive-regex'])
-#    pastie_id = '45389'
-#    p = PastiePasteSiteCom(ps, pastie_id)
-#    p.fetchPastie()
-#    exit()
     main()
