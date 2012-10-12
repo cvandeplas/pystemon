@@ -96,7 +96,7 @@ class PastieSite(threading.Thread):
         return False
 
     def seenPastie(self, pastie_id):
-        ''' check if the pastie was already downloaded, and remember that we've seen it '''
+        ''' check if the pastie was already downloaded. '''
         # first look in memory if we have already seen this pastie
         if self.seen_pasties.count(pastie_id):
             return True
@@ -106,6 +106,10 @@ class PastieSite(threading.Thread):
             if os.path.exists(self.save_dir + os.sep + pastie_id):
                 return True
 
+    def seenPastieAndRemember(self, pastie_id):
+        ''' check if the pastie was already downloaded, and remember that we've seen it '''
+        if self.seenPastie(pastie_id):
+            return True
         # we have not yet seen the pastie
         # keep in memory that we've seen it
         # appendleft for performance reasons (faster later when we iterate over the deque)
@@ -131,11 +135,15 @@ class Pastie():
         f.write(self.pastie_content)  # TODO error checking
 
     def fetchAndProcessPastie(self):
-        # no need to check if the pastie was already downloaded as the getLastPasties() already did that
+        # double check if the pastie was already downloaded, and remember that we've seen it
+        if self.site.seenPastie(self.id):
+            return None
         # download pastie
         self.fetchPastie()
         # save the pastie on the disk
         if self.pastie_content:
+            # keep in memory that the pastie was seen successfully
+            self.site.seenPastieAndRemember(self.id)
             # Save pastie to disk if configured
             if yamlconfig['archive']['save']:
                 self.savePastie()
