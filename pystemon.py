@@ -51,8 +51,11 @@ class PastieSite(threading.Thread):
         self.archive_url = archive_url
         self.archive_regex = archive_regex
         self.save_dir = yamlconfig['archive']['dir'] + os.sep + name
-        if not os.path.exists(self.save_dir):
+        self.archive_dir = yamlconfig['archive']['dir-all'] + os.sep + name
+        if yamlconfig['archive']['save'] and not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
+        if yamlconfig['archive']['save-all'] and not os.path.exists(self.archive_dir):
+            os.makedirs(self.archive_dir)
         self.update_max = 30  # TODO set by config file
         self.update_min = 10  # TODO set by config file
         self.pastie_classname = None
@@ -101,9 +104,9 @@ class PastieSite(threading.Thread):
         if self.seen_pasties.count(pastie_id):
             return True
         # look on the filesystem.  # LATER remove this filesystem lookup as it will give problems on long term
-        if yamlconfig['archive']['save']:
+        if yamlconfig['archive']['save-all']:
             # check if the pastie was already saved on the disk
-            if os.path.exists(self.save_dir + os.sep + pastie_id):
+            if os.path.exists(self.archive_dir + os.sep + pastie_id):
                 return True
 
     def seenPastieAndRemember(self, pastie_id):
@@ -128,10 +131,10 @@ class Pastie():
         self.pastie_content, headers = downloadUrl(self.url)
         return self.pastie_content
 
-    def savePastie(self):
+    def savePastie(self, directory):
         if not self.pastie_content:
             raise SystemExit('BUG: Content not set, sannot save')
-        f = open(self.site.save_dir + os.sep + self.id, 'w')
+        f = open(directory + os.sep + self.id, 'w')
         f.write(self.pastie_content)  # TODO error checking
 
     def fetchAndProcessPastie(self):
@@ -144,9 +147,9 @@ class Pastie():
         if self.pastie_content:
             # keep in memory that the pastie was seen successfully
             self.site.seenPastieAndRemember(self.id)
-            # Save pastie to disk if configured
-            if yamlconfig['archive']['save']:
-                self.savePastie()
+            # Save pastie to archive dir if configured
+            if yamlconfig['archive']['save-all']:
+                self.savePastie(self.site.archive_dir)
             # search for data in pastie
             self.searchContent()
         return self.pastie_content
@@ -156,7 +159,6 @@ class Pastie():
         if not self.pastie_content:
             raise SystemExit('BUG: Content not set, cannot search')
             return False
-        # TODO only alert once per pastie
         # search for the regexes in the htmlPage
         for regex in yamlconfig['regex-search']:
             # TODO first compile regex, then search using compiled version
@@ -165,11 +167,14 @@ class Pastie():
                 matches.append(regex)
                 #print regex
         if matches:
-            self.alertOnMatch(matches)
+            self.actionOnMatch(matches)
 
-    def alertOnMatch(self, matches):
+    def actionOnMatch(self, matches):
         alert = "Found hit for {matches} in pastie {url}".format(matches=matches, url=self.url)
         logger.info(alert)
+        # Save pastie to disk if configured
+        if yamlconfig['archive']['save']:
+            self.savePastie(self.site.save_dir)
         # Send email alert if configured
         if yamlconfig['email']['alert']:
             self.sendEmailAlert(matches)
@@ -245,10 +250,8 @@ class ThreadPasties(threading.Thread):
         while not self.kill_received:
             # grabs pastie from queue
             pastie = self.queue.get()
-            if not pastie:
-                pass
-            logger.info("Queue {name} size: {size}".format(size=self.queue.qsize(), name=self.name))
             pastie_content = pastie.fetchAndProcessPastie()
+            logger.info("Queue {name} size: {size}".format(size=self.queue.qsize(), name=self.name))
             if pastie_content:
                 logger.debug("Saved new pastie from {0} with id {1}".format(self.name, pastie.id))
             else:

@@ -1,6 +1,9 @@
 archive:
-  save: yes             # NOT fully IMPLEMENTED - keep as yes or you will hit a bug
-  dir: "archive"
+  save: yes             # Keep 
+  save-all: yes          # Keep a copy of all pasties
+  dir: "alerts"         # Directory where matching pasties should be kept
+  dir-all: "archive"    # Directory where all pasties should be kept (if save-all is set to yes)
+  
 
 email:
   alert: no
@@ -71,6 +74,31 @@ site:
     download-url: 'http://pastesite.com/plain/{id}.txt'
     update-max: 20
     update-min: 10
+
+  gist.github.com:
+    archive-url: 'https://gist.github.com/gists'
+    archive-regex: '<span><a href="/([0-9]+)">gist'
+    download-url: 'https://raw.github.com/gist/{id}'
+    
+  codepad.org:
+    archive-url: 'http://codepad.org/recent'
+    archive-regex: '<a href="http://codepad.org/([a-zA-Z0-9]+)">view'
+    download-url: 'http://codepad.org/{id}/raw.txt'
+    
+
+# TODO
+# http://hastebin.com/   # no list of last pastes
+# http://sebsauvage.net/paste/  # no list of last pastes
+# https://snipt.net/
+# http://www.safebin.net/
+# http://cdv.lt/
+# http://tny.cz/
+# https://pastee.org/
+# http://slexy.org/
+# http://paste2.org/
+# http://0bin.net/
+# http://markable.in/
+# http://www.heypasteit.com/
 
 #####
 # Configuration section to configure proxies
