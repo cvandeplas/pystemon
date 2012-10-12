@@ -60,14 +60,13 @@ class PastieSite(threading.Thread):
 
     def run(self):
         while not self.kill_received:
+            sleep_time = random.randint(self.update_min, self.update_max)
             # grabs site from queue
-            logger.info("Downloading pasties from {0}".format(self.name))
+            logger.info("Downloading pasties from {name}. Next download scheduled in {time} seconds".format(name=self.name, time=sleep_time))
             # get the list of last pasties, but reverse it so we first have the old
             # entries and then the new ones
             for pastie in reversed(self.getLastPasties()):
                 queues[self.name].put(pastie)  # add pastie to queue
-            sleep_time = random.randint(self.update_min, self.update_max)
-            logger.info("Sleeping {name} for {time} seconds".format(name=self.name, time=sleep_time))
             time.sleep(sleep_time)
 
     def getLastPasties(self):
@@ -80,6 +79,11 @@ class PastieSite(threading.Thread):
         pasties_ids = re.findall(self.archive_regex, htmlPage)
         if pasties_ids:
             for pastie_id in pasties_ids:
+                # check if the pastie was already downloaded, and remember that we've seen it
+                if self.seenPastie(pastie_id):
+                    # do not append the seen things again in the queue
+                    continue
+                # pastie was not downloaded yet. Add it to the queue
                 if self.pastie_classname:
                     class_name = globals()[self.pastie_classname]
                     pastie = class_name(self, pastie_id)
@@ -88,7 +92,7 @@ class PastieSite(threading.Thread):
                 pasties.append(pastie)
             logger.debug("Found {amount} pasties for site {site}".format(amount=len(pasties_ids), site=self.name))
             return pasties
-        logger.warn("No last pasties matches for regular expression site:{site} regex:{regex}".format(site=self.name, regex=self.archive_regex))
+        logger.error("No last pasties matches for regular expression site:{site} regex:{regex}. Error in your regex?".format(site=self.name, regex=self.archive_regex))
         return False
 
     def seenPastie(self, pastie_id):
@@ -127,9 +131,7 @@ class Pastie():
         f.write(self.pastie_content)  # TODO error checking
 
     def fetchAndProcessPastie(self):
-        # check if the pastie was already downloaded, and remember that we've seen it
-        if self.site.seenPastie(self.id):
-            return None
+        # no need to check if the pastie was already downloaded as the getLastPasties() already did that
         # download pastie
         self.fetchPastie()
         # save the pastie on the disk
@@ -235,10 +237,12 @@ class ThreadPasties(threading.Thread):
         while not self.kill_received:
             # grabs pastie from queue
             pastie = self.queue.get()
+            if not pastie:
+                pass
+            logger.info("Queue {name} size: {size}".format(size=self.queue.qsize(), name=self.name))
             pastie_content = pastie.fetchAndProcessPastie()
             if pastie_content:
                 logger.debug("Saved new pastie from {0} with id {1}".format(self.name, pastie.id))
-                logger.info("Queue {name} size: {size}".format(size=self.queue.qsize(), name=self.name))
             else:
                 # pastie already downloaded OR error ?
                 pass
