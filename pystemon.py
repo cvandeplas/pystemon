@@ -38,7 +38,7 @@ from email import Encoders
 socket.setdefaulttimeout(10)  # set a default timeout of 10 seconds to download the page (default = unlimited)
 
 
-class PasteSite(threading.Thread):
+class PastieSite(threading.Thread):
     '''
     Instances of these threads are responsible to download the list of the last pastes
     and adding them to the list of pending tasks for individual pastes
@@ -109,7 +109,7 @@ class Pastie():
         f = open(self.site.save_dir + os.sep + self.id, 'w')
         f.write(self.pastie_content)  # TODO error checking
 
-    def pastieAlreadySeen(self):
+    def seenPastie(self):
         if yamlconfig['archive']['save']:
             # check if the pastie was already saved on the disk
             if os.path.exists(self.site.save_dir + os.sep + self.id):
@@ -118,7 +118,7 @@ class Pastie():
 
     def fetchAndProcessPastie(self):
         # check if the pastie was already downloaded
-        if self.pastieAlreadySeen():
+        if self.seenPastie():
             return None
         # download pastie
         self.fetchPastie()
@@ -190,6 +190,10 @@ The paste has also been attached to this email.
 
 
 class PastiePasteSiteCom(Pastie):
+    '''
+    Custom Pastie class for the pastesite.com site
+    This class overloads the fetchPastie function to do the form submit to get the raw pastie
+    '''
     def __init__(self, site, pastie_id):
         Pastie.__init__(self, site, pastie_id)
 
@@ -238,7 +242,7 @@ def main():
     queues = {}
     threads = []
 
-    # spawn a pool of threads per PasteSite, and pass them a queue instance
+    # spawn a pool of threads per PastieSite, and pass them a queue instance
     for site in yamlconfig['site']:
         queues[site] = Queue.Queue()
         for i in range(yamlconfig['threads']):
@@ -249,7 +253,7 @@ def main():
 
     # build threads to download the last pasties
     for site_name in yamlconfig['site']:
-        t = PasteSite(site_name,
+        t = PastieSite(site_name,
                       yamlconfig['site'][site_name]['download-url'],
                       yamlconfig['site'][site_name]['archive-url'],
                       yamlconfig['site'][site_name]['archive-regex'])
@@ -413,7 +417,7 @@ if __name__ == "__main__":
 
     # run the software
 #    site_name = 'pastesite.com'
-#    ps = PasteSite(site_name,
+#    ps = PastieSite(site_name,
 #                      yamlconfig['site'][site_name]['download-url'],
 #                      yamlconfig['site'][site_name]['archive-url'],
 #                      yamlconfig['site'][site_name]['archive-regex'])
