@@ -107,7 +107,7 @@ class PastieSite(threading.Thread):
         # look on the filesystem.  # LATER remove this filesystem lookup as it will give problems on long term
         if yamlconfig['archive']['save-all']:
             # check if the pastie was already saved on the disk
-            if os.path.exists(self.archive_dir + os.sep + pastie_id):
+            if os.path.exists(self.archive_dir + os.sep + self.pastieIdToFilename(pastie_id)):
                 return True
 
     def seenPastieAndRemember(self, pastie_id):
@@ -119,6 +119,9 @@ class PastieSite(threading.Thread):
         # appendleft for performance reasons (faster later when we iterate over the deque)
         self.seen_pasties.appendleft(pastie_id)
         return False
+
+    def pastieIdToFilename(self, pastie_id):
+        return pastie_id.replace('/', '_')
 
 
 class Pastie():
@@ -135,7 +138,7 @@ class Pastie():
     def savePastie(self, directory):
         if not self.pastie_content:
             raise SystemExit('BUG: Content not set, sannot save')
-        f = open(directory + os.sep + self.id, 'w')
+        f = open(directory + os.sep + self.site.pastieIdToFilename(self.id), 'w')
         f.write(self.pastie_content.encode('utf8'))  # TODO error checking
 
     def fetchAndProcessPastie(self):
@@ -238,7 +241,7 @@ class PastiePasteSiteCom(Pastie):
 
 class PastieCdvLt(Pastie):
     '''
-    Custom Pastie class for the pastesite.com site
+    Custom Pastie class for the cdv.lt site
     This class overloads the fetchPastie function to do the form submit to get the raw pastie
     '''
     def __init__(self, site, pastie_id):
@@ -253,6 +256,26 @@ class PastieCdvLt(Pastie):
         if json_pastie:
             # and extract the code
             self.pastie_content = json_pastie[0]['code_record']
+        return self.pastie_content
+
+
+class PastieSniptNet(Pastie):
+    '''
+    Custom Pastie class for the snipt.net site
+    This class overloads the fetchPastie function to do the form submit to get the raw pastie
+    '''
+    def __init__(self, site, pastie_id):
+        Pastie.__init__(self, site, pastie_id)
+
+    def fetchPastie(self):
+        downloaded_page, headers = downloadUrl(self.url)
+        htmlDom = BeautifulSoup(downloaded_page)
+        # search for <textarea class="raw">
+        textarea = htmlDom.first('textarea', {'class': 'raw'})
+        if textarea:
+            # replace html entities like &gt;
+            decoded = BeautifulSoup(textarea.contents[0], convertEntities=BeautifulSoup.HTML_ENTITIES)
+            self.pastie_content = decoded.contents[0]
         return self.pastie_content
 
 

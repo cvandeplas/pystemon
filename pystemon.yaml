@@ -1,6 +1,6 @@
 archive:
   save: yes             # Keep 
-  save-all: yes          # Keep a copy of all pasties
+  save-all: no          # Keep a copy of all pasties
   dir: "alerts"         # Directory where matching pasties should be kept
   dir-all: "archive"    # Directory where all pasties should be kept (if save-all is set to yes)
   
@@ -50,30 +50,22 @@ site:
     archive-url: 'http://pastie.org/pastes'
     archive-regex: '<a href="http://pastie.org/pastes/(\d{7})">'
     download-url: 'http://pastie.org/pastes/{id}/text'
-    update-max: 20
-    update-min: 10
 
   nopaste.me:
     archive-url: 'http://nopaste.me/recent' 
     archive-regex: '<a href="http://nopaste.me/paste/([a-zA-Z0-9]+)">'
     download-url: 'http://nopaste.me/download/{id}.txt'
-    update-max: 20
-    update-min: 10
 
   slexy.org:
     archive-url: 'http://slexy.org/recent' 
     archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
     download-url: 'http://slexy.org/raw/{id}'
-    update-max: 20
-    update-min: 10
 
   pastesite.com:
     pastie-classname: PastiePasteSiteCom
     archive-url: 'http://pastesite.com/recent' 
     archive-regex: '<a href="(\d+)" title="View this Paste'
     download-url: 'http://pastesite.com/plain/{id}.txt'
-    update-max: 20
-    update-min: 10
 
   gist.github.com:
     archive-url: 'https://gist.github.com/gists'
@@ -85,20 +77,40 @@ site:
     archive-regex: '<a href="http://codepad.org/([a-zA-Z0-9]+)">view'
     download-url: 'http://codepad.org/{id}/raw.txt'
     
+  cdv.lt:  # FIXME write custom class to extract data from textarea
+    pastie-classname: PastieCdvLt
+    archive-url: 'http://cdv.lt/snippets'
+    archive-regex: '<a href="/cv/([a-zA-Z0-9]+)">'
+    download-url: 'http://cdv.lt/getData?sn={id}&callback=json1'
+
+  snipt.net:
+    pastie-classname: PastieSniptNet
+    #archive-url: 'https://snipt.net/'
+    #archive-regex: '<h1><a href="/([a-zA-Z0-9-_/]+)/">'
+    archive-url: 'https://snipt.net/?rss'
+    archive-regex: '<link>https://snipt.net/(.+)/</link>'
+    download-url: 'https://snipt.net/{id}/'
+
+#  safebin.net:  # FIXME not finished
+#    archive-url: 'http://safebin.net/?archive'
+#    archive-regex: '<a title="[a-zA-Z0-9 :,]+" href="/([0-9]+)">'
+#    download-url: 'http://safebin.net/{id}'
+#    update-max: 60
+#    update-min: 50
+
 
 # TODO
-# http://hastebin.com/   # no list of last pastes
+# http://www.safebin.net/  # more complex site
+# http://www.heypasteit.com/    # http://www.heypasteit.com/clip/0IZA => incremental 
+
+# http://hastebin.com/          # no list of last pastes
 # http://sebsauvage.net/paste/  # no list of last pastes
-# https://snipt.net/
-# http://www.safebin.net/
-# http://cdv.lt/
-# http://tny.cz/
-# https://pastee.org/
-# http://slexy.org/
-# http://paste2.org/
-# http://0bin.net/
-# http://markable.in/
-# http://www.heypasteit.com/
+# http://tny.cz/                # no list of last pastes
+# https://pastee.org/           # no list of last pastes
+# http://paste2.org/            # no list of last pastes
+# http://0bin.net/              # no list of last pastes
+# http://markable.in/           # no list of last pastes
+
 
 #####
 # Configuration section to configure proxies
