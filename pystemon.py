@@ -29,6 +29,7 @@ import re
 import os
 import smtplib
 import random
+import json
 from BeautifulSoup import BeautifulSoup
 from email.MIMEMultipart import MIMEMultipart
 from email.MIMEBase import MIMEBase
@@ -135,7 +136,7 @@ class Pastie():
         if not self.pastie_content:
             raise SystemExit('BUG: Content not set, sannot save')
         f = open(directory + os.sep + self.id, 'w')
-        f.write(self.pastie_content)  # TODO error checking
+        f.write(self.pastie_content.encode('utf8'))  # TODO error checking
 
     def fetchAndProcessPastie(self):
         # double check if the pastie was already downloaded, and remember that we've seen it
@@ -232,6 +233,26 @@ class PastiePasteSiteCom(Pastie):
         url = "http://pastesite.com/plain/{id}".format(id=self.id)
         cookie = headers.dict['set-cookie']
         self.pastie_content, headers = downloadUrl(url, data, cookie)
+        return self.pastie_content
+
+
+class PastieCdvLt(Pastie):
+    '''
+    Custom Pastie class for the pastesite.com site
+    This class overloads the fetchPastie function to do the form submit to get the raw pastie
+    '''
+    def __init__(self, site, pastie_id):
+        Pastie.__init__(self, site, pastie_id)
+
+    def fetchPastie(self):
+        downloaded_page, headers = downloadUrl(self.url)
+        # make the json valid: strip json1(  )
+        downloaded_page = u'[' + downloaded_page[6:-2] + u']'
+        # convert to json object
+        json_pastie = json.loads(downloaded_page)
+        if json_pastie:
+            # and extract the code
+            self.pastie_content = json_pastie[0]['code_record']
         return self.pastie_content
 
 
@@ -359,8 +380,9 @@ def downloadUrl(url, data=None, cookie=None):
             opener = urllib2.build_opener(NoRedirectHandler())
         # Random User-Agent if set in config
         user_agent = getRandomUserAgent()
+        opener.addheaders = [('Accept-Charset', 'utf-8')]
         if user_agent:
-            opener.addheaders = [('User-Agent', user_agent)]
+            opener.addheaders.append([('User-Agent', user_agent)])
         if cookie:
             opener.addheaders.append(('Cookie', cookie))
         logger.debug("Downloading url: {url} with proxy:{proxy} and user-agent:{ua}".format(url=url, proxy=random_proxy, ua=user_agent))
@@ -368,7 +390,7 @@ def downloadUrl(url, data=None, cookie=None):
             response = opener.open(url, data)
         else:
             response = opener.open(url)
-        htmlPage = response.read()
+        htmlPage = unicode(response.read(), errors='replace')
         # If we receive a "slow down" message, follow Pastebin recommendation!
         if 'Please slow down' in htmlPage:
             logger.warn("Slow down message received. Waiting 5 seconds")
