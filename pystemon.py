@@ -69,9 +69,11 @@ class PastieSite(threading.Thread):
             logger.info("Downloading pasties from {name}. Next download scheduled in {time} seconds".format(name=self.name, time=sleep_time))
             # get the list of last pasties, but reverse it so we first have the old
             # entries and then the new ones
-            for pastie in reversed(self.getLastPasties()):
-                queues[self.name].put(pastie)  # add pastie to queue
-            time.sleep(sleep_time)
+            last_pasties = self.getLastPasties()
+            if last_pasties:
+                for pastie in reversed(last_pasties):
+                    queues[self.name].put(pastie)  # add pastie to queue
+                time.sleep(sleep_time)
 
     def getLastPasties(self):
         # reset the pasties list
@@ -96,7 +98,7 @@ class PastieSite(threading.Thread):
                 pasties.append(pastie)
             logger.debug("Found {amount} pasties for site {site}".format(amount=len(pasties_ids), site=self.name))
             return pasties
-        logger.error("No last pasties matches for regular expression site:{site} regex:{regex}. Error in your regex?".format(site=self.name, regex=self.archive_regex))
+        logger.error("No last pasties matches for regular expression site:{site} regex:{regex}. Error in your regex? Dumping htmlPage \n {html}".format(site=self.name, regex=self.archive_regex, html=htmlPage.encode('utf8')))
         return False
 
     def seenPastie(self, pastie_id):
@@ -228,14 +230,19 @@ class PastiePasteSiteCom(Pastie):
 
     def fetchPastie(self):
         validation_form_page, headers = downloadUrl(self.url)
-        htmlDom = BeautifulSoup(validation_form_page)
-        content_left = htmlDom.find(id='full-width')
-        plain_confirm = content_left.find('input')['value']
-        # build a form with plainConfirm = value and the cookie
-        data = urllib.urlencode({'plainConfirm': plain_confirm})
-        url = "http://pastesite.com/plain/{id}".format(id=self.id)
-        cookie = headers.dict['set-cookie']
-        self.pastie_content, headers = downloadUrl(url, data, cookie)
+        if validation_form_page:
+            htmlDom = BeautifulSoup(validation_form_page)
+            if not htmlDom:
+                return self.pastie_content
+            content_left = htmlDom.find(id='full-width')
+            if not content_left:
+                return self.pastie_content
+            plain_confirm = content_left.find('input')['value']
+            # build a form with plainConfirm = value and the cookie
+            data = urllib.urlencode({'plainConfirm': plain_confirm})
+            url = "http://pastesite.com/plain/{id}".format(id=self.id)
+            cookie = headers.dict['set-cookie']
+            self.pastie_content, headers = downloadUrl(url, data, cookie)
         return self.pastie_content
 
 
@@ -249,13 +256,14 @@ class PastieCdvLt(Pastie):
 
     def fetchPastie(self):
         downloaded_page, headers = downloadUrl(self.url)
-        # make the json valid: strip json1(  )
-        downloaded_page = u'[' + downloaded_page[6:-2] + u']'
-        # convert to json object
-        json_pastie = json.loads(downloaded_page)
-        if json_pastie:
-            # and extract the code
-            self.pastie_content = json_pastie[0]['code_record']
+        if downloaded_page:
+            # make the json valid: strip json1(  )
+            downloaded_page = u'[' + downloaded_page[6:-2] + u']'
+            # convert to json object
+            json_pastie = json.loads(downloaded_page)
+            if json_pastie:
+                # and extract the code
+                self.pastie_content = json_pastie[0]['code_record']
         return self.pastie_content
 
 
@@ -269,13 +277,14 @@ class PastieSniptNet(Pastie):
 
     def fetchPastie(self):
         downloaded_page, headers = downloadUrl(self.url)
-        htmlDom = BeautifulSoup(downloaded_page)
-        # search for <textarea class="raw">
-        textarea = htmlDom.first('textarea', {'class': 'raw'})
-        if textarea:
-            # replace html entities like &gt;
-            decoded = BeautifulSoup(textarea.contents[0], convertEntities=BeautifulSoup.HTML_ENTITIES)
-            self.pastie_content = decoded.contents[0]
+        if downloaded_page:
+            htmlDom = BeautifulSoup(downloaded_page)
+            # search for <textarea class="raw">
+            textarea = htmlDom.first('textarea', {'class': 'raw'})
+            if textarea:
+                # replace html entities like &gt;
+                decoded = BeautifulSoup(textarea.contents[0], convertEntities=BeautifulSoup.HTML_ENTITIES)
+                self.pastie_content = decoded.contents[0]
         return self.pastie_content
 
 
@@ -349,31 +358,63 @@ def main():
             exit(0)  # quit immediately
 
 
+user_agents_list = []
+
+
+def loadUserAgentsFromFile(filename):
+    global user_agents_list
+    try:
+        f = open(filename)
+    except:
+        logger.error('Configuration problem: user-agent-file "{file}" not found or not readable.'.format(file=filename))
+    for line in f:
+        line = line.strip()
+        if line:
+            user_agents_list.append(line)
+    logger.debug('Found {count} UserAgents in file "{file}"'.format(file=filename, count=len(user_agents_list)))
+
+
 def getRandomUserAgent():
-    if yamlconfig['user-agent']['random'] and yamlconfig['user-agent']['list']:
-        return random.choice(yamlconfig['user-agent']['list'])
+    global proxies_list
+    if user_agents_list:
+        return random.choice(user_agents_list)
     return None
-
-
-def getRandomProxy():
-    proxy = None
-    proxies_lock.acquire()
-    if yamlconfig['proxy']['random'] and yamlconfig['proxy']['list']:
-        proxy = random.choice(yamlconfig['proxy']['list'])
-    proxies_lock.release()
-    return proxy
 
 
 proxies_failed = []
 proxies_lock = threading.Lock()
+proxies_list = []
+
+
+def loadProxiesFromFile(filename):
+    global proxies_list
+    try:
+        f = open(filename)
+    except:
+        logger.error('Configuration problem: proxyfile "{file}" not found or not readable.'.format(file=filename))
+    for line in f:
+        line = line.strip()
+        if line:  # LATER verify if the proxy line has the correct structure
+            proxies_list.append(line)
+    logger.debug('Found {count} proxies in file "{file}"'.format(file=filename, count=len(proxies_list)))
+
+
+def getRandomProxy():
+    global proxies_list
+    proxy = None
+    proxies_lock.acquire()
+    if proxies_list:
+        proxy = random.choice(proxies_list)
+    proxies_lock.release()
+    return proxy
 
 
 def failedProxy(proxy):
     proxies_failed.append(proxy)
-    if proxies_failed.count(proxy) >= 5 and yamlconfig['proxy']['list'].count(proxy) >= 1:
+    if proxies_failed.count(proxy) >= 5 and proxies_list.count(proxy) >= 1:
         logger.info("Removing proxy {0} from proxy list because of to many errors errors.".format(proxy))
         proxies_lock.acquire()
-        yamlconfig['proxy']['list'].remove(proxy)
+        proxies_list.remove(proxy)
         proxies_lock.release()
 
 
@@ -396,8 +437,8 @@ def downloadUrl(url, data=None, cookie=None):
         # Random Proxy if set in config
         random_proxy = getRandomProxy()
         if random_proxy:
-            proxy = urllib2.ProxyHandler({'http': random_proxy})
-            opener = urllib2.build_opener(proxy, NoRedirectHandler())
+            proxyh = urllib2.ProxyHandler({'http': random_proxy})
+            opener = urllib2.build_opener(proxyh, NoRedirectHandler())
         # We need to create an opener if it didn't exist yet
         if not opener:
             opener = urllib2.build_opener(NoRedirectHandler())
@@ -405,10 +446,10 @@ def downloadUrl(url, data=None, cookie=None):
         user_agent = getRandomUserAgent()
         opener.addheaders = [('Accept-Charset', 'utf-8')]
         if user_agent:
-            opener.addheaders.append([('User-Agent', user_agent)])
+            opener.addheaders.append(('User-Agent', user_agent))
         if cookie:
             opener.addheaders.append(('Cookie', cookie))
-        logger.debug("Downloading url: {url} with proxy:{proxy} and user-agent:{ua}".format(url=url, proxy=random_proxy, ua=user_agent))
+        logger.debug("Downloading url: {url} with proxy: {proxy} and user-agent: {ua}".format(url=url, proxy=random_proxy, ua=user_agent))
         if data:
             response = opener.open(url, data)
         else:
@@ -422,7 +463,7 @@ def downloadUrl(url, data=None, cookie=None):
         return htmlPage, response.headers
     except urllib2.HTTPError:
         logger.warn("ERROR: HTTP Error ############################# " + url)
-        return None
+        return None, None
     except urllib2.URLError:
         logger.debug("ERROR: URL Error ############################# " + url)
         if random_proxy:  # remove proxy from the list if needed
@@ -435,6 +476,9 @@ def downloadUrl(url, data=None, cookie=None):
             failedProxy(random_proxy)
             logger.warn("Failed to download the page because of proxy error {0} trying again.".format(url))
             return downloadUrl(url)
+#    except:
+#        logger.error("ERROR: Other HTTPlib error.")
+#        return None, None
     # do NOT try to download the url again here, as we might end in enless loop
 
 
@@ -449,6 +493,10 @@ def parseConfigFile(configfile):
             logger.error("error position: (%s:%s)" % (mark.line + 1, mark.column + 1))
             exit(1)
     # TODO verify validity of config parameters
+    if yamlconfig['proxy']['random']:
+        loadProxiesFromFile(yamlconfig['proxy']['file'])
+    if yamlconfig['user-agent']['random']:
+        loadUserAgentsFromFile(yamlconfig['user-agent']['file'])
 
 
 if __name__ == "__main__":
@@ -474,7 +522,6 @@ if __name__ == "__main__":
     if not os.path.isfile(options.config):
         parser.error('Configuration file not found. Please create /etc/pystemon.yaml, pystemon.yaml or specify a config file using the -c option.')
         exit(1)
-    parseConfigFile(options.config)
 
     logger = logging.getLogger('pystemon')
     logger.setLevel(logging.INFO)
@@ -487,5 +534,7 @@ if __name__ == "__main__":
         logger.addHandler(logging.handlers.SysLogHandler(facility=logging.handlers.SysLogHandler.LOG_DAEMON))
         # FIXME run application in background
 
+    parseConfigFile(options.config)
+    #exit()
     # run the software
     main()

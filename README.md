@@ -23,3 +23,4 @@ Default configuration file: /etc/pystemon.yaml or pystemon.yaml in current direc
 
 Limitations:
 - Only HTTP proxies are allowed
+- Only HTTP urls will use proxies
