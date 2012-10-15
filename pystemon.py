@@ -73,7 +73,7 @@ class PastieSite(threading.Thread):
             if last_pasties:
                 for pastie in reversed(last_pasties):
                     queues[self.name].put(pastie)  # add pastie to queue
-                time.sleep(sleep_time)
+            time.sleep(sleep_time)
 
     def getLastPasties(self):
         # reset the pasties list
@@ -81,6 +81,7 @@ class PastieSite(threading.Thread):
         # populate queue with data
         htmlPage, headers = downloadUrl(self.archive_url)
         if not htmlPage:
+            logger.warning("No HTML content for page {url}".format(url=self.archive_url))
             return False
         pasties_ids = re.findall(self.archive_regex, htmlPage)
         if pasties_ids:
@@ -96,7 +97,7 @@ class PastieSite(threading.Thread):
                 else:
                     pastie = Pastie(self, pastie_id)
                 pasties.append(pastie)
-            logger.debug("Found {amount} pasties for site {site}".format(amount=len(pasties_ids), site=self.name))
+            logger.debug("Found {amount} new pasties for site {site}".format(amount=len(pasties), site=self.name))
             return pasties
         logger.error("No last pasties matches for regular expression site:{site} regex:{regex}. Error in your regex? Dumping htmlPage \n {html}".format(site=self.name, regex=self.archive_regex, html=htmlPage.encode('utf8')))
         return False
@@ -457,24 +458,24 @@ def downloadUrl(url, data=None, cookie=None):
         htmlPage = unicode(response.read(), errors='replace')
         # If we receive a "slow down" message, follow Pastebin recommendation!
         if 'Please slow down' in htmlPage:
-            logger.warn("Slow down message received. Waiting 5 seconds")
+            logger.warning("Slow down message received. Waiting 5 seconds")
             time.sleep(5)
             return downloadUrl(url)
         return htmlPage, response.headers
     except urllib2.HTTPError:
-        logger.warn("ERROR: HTTP Error ############################# " + url)
+        logger.warning("ERROR: HTTP Error ############################# " + url)
         return None, None
     except urllib2.URLError:
         logger.debug("ERROR: URL Error ############################# " + url)
         if random_proxy:  # remove proxy from the list if needed
             failedProxy(random_proxy)
-            logger.warn("Failed to download the page because of proxy error {0} trying again.".format(url))
+            logger.warning("Failed to download the page because of proxy error {0} trying again.".format(url))
             return downloadUrl(url)
     except socket.timeout:
         logger.debug("ERROR: timeout ############################# " + url)
         if random_proxy:  # remove proxy from the list if needed
             failedProxy(random_proxy)
-            logger.warn("Failed to download the page because of proxy error {0} trying again.".format(url))
+            logger.warning("Failed to download the page because of proxy error {0} trying again.".format(url))
             return downloadUrl(url)
 #    except:
 #        logger.error("ERROR: Other HTTPlib error.")
