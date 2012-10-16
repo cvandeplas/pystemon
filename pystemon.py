@@ -101,7 +101,7 @@ class PastieSite(threading.Thread):
                 else:
                     pastie = Pastie(self, pastie_id)
                 pasties.append(pastie)
-            logger.debug("Found {amount} new pasties for site {site}".format(amount=len(pasties), site=self.name))
+            logger.info("Found {amount} new pasties for site {site}".format(amount=len(pasties), site=self.name))
             return pasties
         logger.error("No last pasties matches for regular expression site:{site} regex:{regex}. Error in your regex? Dumping htmlPage \n {html}".format(site=self.name, regex=self.archive_regex, html=htmlPage.encode('utf8')))
         return False
@@ -310,7 +310,7 @@ class ThreadPasties(threading.Thread):
                 # grabs pastie from queue
                 pastie = self.queue.get()
                 pastie_content = pastie.fetchAndProcessPastie()
-                logger.info("Queue {name} size: {size}".format(size=self.queue.qsize(), name=self.name))
+                logger.debug("Queue {name} size: {size}".format(size=self.queue.qsize(), name=self.name))
                 if pastie_content:
                     logger.debug("Saved new pastie from {0} with id {1}".format(self.name, pastie.id))
                 else:
