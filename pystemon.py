@@ -64,15 +64,19 @@ class PastieSite(threading.Thread):
 
     def run(self):
         while not self.kill_received:
-            sleep_time = random.randint(self.update_min, self.update_max)
-            # grabs site from queue
-            logger.info("Downloading pasties from {name}. Next download scheduled in {time} seconds".format(name=self.name, time=sleep_time))
-            # get the list of last pasties, but reverse it so we first have the old
-            # entries and then the new ones
-            last_pasties = self.getLastPasties()
-            if last_pasties:
-                for pastie in reversed(last_pasties):
-                    queues[self.name].put(pastie)  # add pastie to queue
+            try:
+                sleep_time = random.randint(self.update_min, self.update_max)
+                # grabs site from queue
+                logger.info("Downloading pasties from {name}. Next download scheduled in {time} seconds".format(name=self.name, time=sleep_time))
+                # get the list of last pasties, but reverse it so we first have the old
+                # entries and then the new ones
+                last_pasties = self.getLastPasties()
+                if last_pasties:
+                    for pastie in reversed(last_pasties):
+                        queues[self.name].put(pastie)  # add pastie to queue
+            # catch unknown errors
+            except:
+                logger.error("Thread for {name} crashed unexpectectly, recovering...".format(name=self.name))
             time.sleep(sleep_time)
 
     def getLastPasties(self):
@@ -302,17 +306,21 @@ class ThreadPasties(threading.Thread):
 
     def run(self):
         while not self.kill_received:
-            # grabs pastie from queue
-            pastie = self.queue.get()
-            pastie_content = pastie.fetchAndProcessPastie()
-            logger.info("Queue {name} size: {size}".format(size=self.queue.qsize(), name=self.name))
-            if pastie_content:
-                logger.debug("Saved new pastie from {0} with id {1}".format(self.name, pastie.id))
-            else:
-                # pastie already downloaded OR error ?
-                pass
-            # signals to queue job is done
-            self.queue.task_done()
+            try:
+                # grabs pastie from queue
+                pastie = self.queue.get()
+                pastie_content = pastie.fetchAndProcessPastie()
+                logger.info("Queue {name} size: {size}".format(size=self.queue.qsize(), name=self.name))
+                if pastie_content:
+                    logger.debug("Saved new pastie from {0} with id {1}".format(self.name, pastie.id))
+                else:
+                    # pastie already downloaded OR error ?
+                    pass
+                # signals to queue job is done
+                self.queue.task_done()
+            # catch unknown errors
+            except:
+                logger.error("ThreadPasties for {name} crashed unexpectectly, recovering...".format(name=self.name))
 
 
 def main():
