@@ -3,7 +3,7 @@ archive:
   save-all: yes          # Keep a copy of all pasties
   dir: "alerts"         # Directory where matching pasties should be kept
   dir-all: "archive"    # Directory where all pasties should be kept (if save-all is set to yes)
-  
+  compress: no          # Store the pasties compressed
 
 email:
   alert: no
@@ -14,7 +14,9 @@ email:
 
 #####
 # Definition of regular expressions to search for in the pasties
-#
+# example: 'example\.com'
+# example: '[^a-zA-Z0-9]example\.com'
+# 
 regex-search:
   - 'foobar'
   - 'mp3'

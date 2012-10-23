@@ -30,6 +30,7 @@ import os
 import smtplib
 import random
 import json
+import gzip
 from BeautifulSoup import BeautifulSoup
 from email.MIMEMultipart import MIMEMultipart
 from email.MIMEBase import MIMEBase
@@ -57,6 +58,7 @@ class PastieSite(threading.Thread):
             os.makedirs(self.save_dir)
         if yamlconfig['archive']['save-all'] and not os.path.exists(self.archive_dir):
             os.makedirs(self.archive_dir)
+        self.archive_compress = yamlconfig['archive']['compress']
         self.update_max = 30  # TODO set by config file
         self.update_min = 10  # TODO set by config file
         self.pastie_classname = None
@@ -128,7 +130,10 @@ class PastieSite(threading.Thread):
         return False
 
     def pastieIdToFilename(self, pastie_id):
-        return pastie_id.replace('/', '_')
+        filename = pastie_id.replace('/', '_')
+        if self.archive_compress:
+            filename = filename + ".gz"
+        return filename
 
 
 class Pastie():
@@ -145,8 +150,15 @@ class Pastie():
     def savePastie(self, directory):
         if not self.pastie_content:
             raise SystemExit('BUG: Content not set, sannot save')
-        f = open(directory + os.sep + self.site.pastieIdToFilename(self.id), 'w')
-        f.write(self.pastie_content.encode('utf8'))  # TODO error checking
+        full_path = directory + os.sep + self.site.pastieIdToFilename(self.id)
+        if self.site.archive_compress:
+            f = gzip.open(full_path, 'w')
+            f.write(self.pastie_content.encode('utf8'))  # TODO error checking
+            f.close()
+        else:
+            f = open(full_path, 'w')
+            f.write(self.pastie_content.encode('utf8'))  # TODO error checking
+            f.close()
 
     def fetchAndProcessPastie(self):
         # double check if the pastie was already downloaded, and remember that we've seen it
