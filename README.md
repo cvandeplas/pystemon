@@ -7,6 +7,9 @@ Copyleft GPLv3 - Christophe Vandeplas - christophe@vandeplas.com
 Feel free to use the code, but please share the changes you've made
 
 Features:
+- search for regular expressions in pasties
+- (optional) only trigger on X hits in the same pastie
+- (optional) exclude matching pasties if exclusion regex matches
 - flexible design, minimal effort to add another paste* site
 - uses multiple threads per unique site to download the pastes
 - waits a random time (within a range) before downloading the latest pastes, time customizable per site

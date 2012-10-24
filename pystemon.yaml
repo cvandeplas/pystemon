@@ -19,13 +19,17 @@ email:
 
 #####
 # Definition of regular expressions to search for in the pasties
-# example: 'example\.com'
-# example: '[^a-zA-Z0-9]example\.com'
 # 
-regex-search:
-  - 'foobar'
-  - 'mp3'
-  - 'download'
+search:
+#  - description: ''    # (optional) A human readable description. (used in alerting)
+#    search: ''         # The regular expression to search for
+#    count: ''          # (optional) How many hits should it have to be interesting?
+#    exclude: ''        # (optional) Do not alert if this regular expression matches
+  - search: '[^a-zA-Z0-9]example\.com'
+  - description: 'Download (non-porn)'
+    search: 'download'
+    exclude: 'porn|sex|teen'
+    count: 4
 
 #####
 # Configuration section for the paste sites

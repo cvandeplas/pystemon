@@ -188,17 +188,33 @@ class Pastie():
             raise SystemExit('BUG: Content not set, cannot search')
             return False
         # search for the regexes in the htmlPage
-        for regex in yamlconfig['regex-search']:
-            # TODO first compile regex, then search using compiled version
-            m = re.search(regex, self.pastie_content)
+        for regex in yamlconfig['search']:
+            #if not 'search' in regex: # TODO move this in the configuration file validation
+            #    logger.warning('No search key in configuration: {0}'.format(regex))
+            #    continue
+
+            # LATER first compile regex, then search using compiled version
+            m = re.findall(regex['search'], self.pastie_content, re.IGNORECASE)
             if m:
+                # ignore if not enough counts
+                if 'count' in regex and len(m) < regex['count']:
+                    continue
+                # ignore if exclude
+                if 'exclude' in regex and re.search(regex['exclude'], self.pastie_content, re.IGNORECASE):
+                    continue
+                # we have a match, add to match list
                 matches.append(regex)
-                #print regex
         if matches:
             self.actionOnMatch(matches)
 
     def actionOnMatch(self, matches):
-        alert = "Found hit for {matches} in pastie {url}".format(matches=matches, url=self.url)
+        descriptions = []
+        for match in matches:
+            if 'description' in match:
+                descriptions.append(match['description'])
+            else:
+                descriptions.append(match['search'])
+        alert = "Found hit for {matches} in pastie {url}".format(matches=descriptions, url=self.url)
         logger.info(alert)
         # Save pastie to disk if configured
         if yamlconfig['archive']['save']:
@@ -616,6 +632,18 @@ if __name__ == "__main__":
         # FIXME run application in background
 
     parseConfigFile(options.config)
-    #exit()
+    print yamlconfig['search']
+    site_name = 'pastebin.com'
+    ps = PastieSite(site_name,
+                  yamlconfig['site'][site_name]['download-url'],
+                  yamlconfig['site'][site_name]['archive-url'],
+                  yamlconfig['site'][site_name]['archive-regex'])
+    if 'update-min' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['update-min']:
+        ps.update_min = yamlconfig['site'][site_name]['update-min']
+    if 'update-max' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['update-max']:
+        ps.update_max = yamlconfig['site'][site_name]['update-max']
+    if 'pastie-classname' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['pastie-classname']:
+        ps.pastie_classname = yamlconfig['site'][site_name]['pastie-classname']
+
     # run the software
     main()
