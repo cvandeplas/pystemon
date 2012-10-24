@@ -22,6 +22,7 @@ import threading
 import Queue
 from collections import deque
 import time
+from datetime import datetime
 import urllib2
 import urllib
 import socket
@@ -31,6 +32,7 @@ import smtplib
 import random
 import json
 import gzip
+import sqlite3
 from BeautifulSoup import BeautifulSoup
 from email.MIMEMultipart import MIMEMultipart
 from email.MIMEBase import MIMEBase
@@ -118,15 +120,18 @@ class PastieSite(threading.Thread):
             # check if the pastie was already saved on the disk
             if os.path.exists(self.archive_dir + os.sep + self.pastieIdToFilename(pastie_id)):
                 return True
+        # TODO look in the database if it was already seen
 
-    def seenPastieAndRemember(self, pastie_id):
+    def seenPastieAndRemember(self, pastie):
         ''' check if the pastie was already downloaded, and remember that we've seen it '''
-        if self.seenPastie(pastie_id):
+        if self.seenPastie(pastie.id):
             return True
         # we have not yet seen the pastie
         # keep in memory that we've seen it
         # appendleft for performance reasons (faster later when we iterate over the deque)
-        self.seen_pasties.appendleft(pastie_id)
+        self.seen_pasties.appendleft(pastie.id)
+        if db:
+            db.queue.put(pastie)
         return False
 
     def pastieIdToFilename(self, pastie_id):
@@ -141,10 +146,12 @@ class Pastie():
         self.site = site
         self.id = pastie_id
         self.pastie_content = None
+        self.md5 = None
         self.url = self.site.download_url.format(id=self.id)
 
     def fetchPastie(self):
         self.pastie_content, headers = downloadUrl(self.url)
+        # FIXME take md5 of the downloaded file
         return self.pastie_content
 
     def savePastie(self, directory):
@@ -152,13 +159,11 @@ class Pastie():
             raise SystemExit('BUG: Content not set, sannot save')
         full_path = directory + os.sep + self.site.pastieIdToFilename(self.id)
         if self.site.archive_compress:
-            f = gzip.open(full_path, 'w')
-            f.write(self.pastie_content.encode('utf8'))  # TODO error checking
-            f.close()
+            with gzip.open(full_path, 'w') as f:
+                f.write(self.pastie_content.encode('utf8'))  # TODO error checking
         else:
-            f = open(full_path, 'w')
-            f.write(self.pastie_content.encode('utf8'))  # TODO error checking
-            f.close()
+            with open(full_path, 'w') as f:
+                f.write(self.pastie_content.encode('utf8'))  # TODO error checking
 
     def fetchAndProcessPastie(self):
         # double check if the pastie was already downloaded, and remember that we've seen it
@@ -169,7 +174,7 @@ class Pastie():
         # save the pastie on the disk
         if self.pastie_content:
             # keep in memory that the pastie was seen successfully
-            self.site.seenPastieAndRemember(self.id)
+            self.site.seenPastieAndRemember(self)
             # Save pastie to archive dir if configured
             if yamlconfig['archive']['save-all']:
                 self.savePastie(self.site.archive_dir)
@@ -318,7 +323,7 @@ class ThreadPasties(threading.Thread):
 
     def run(self):
         while not self.kill_received:
-            try:
+            #try:
                 # grabs pastie from queue
                 pastie = self.queue.get()
                 pastie_content = pastie.fetchAndProcessPastie()
@@ -331,15 +336,24 @@ class ThreadPasties(threading.Thread):
                 # signals to queue job is done
                 self.queue.task_done()
             # catch unknown errors
-            except:
-                logger.error("ThreadPasties for {name} crashed unexpectectly, recovering...".format(name=self.name))
+            #except:
+            #    logger.error("ThreadPasties for {name} crashed unexpectectly, recovering...".format(name=self.name))
 
 
 def main():
     global queues
     global threads
+    global db
     queues = {}
     threads = []
+
+    # start a thread to handle the DB data
+    db = None
+    if yamlconfig['db'] and yamlconfig['db']['sqlite3'] and yamlconfig['db']['sqlite3']['enable']:
+        db = Sqlite3Database(yamlconfig['db']['sqlite3']['file'])
+        db.setDaemon(True)
+        threads.append(db)
+        db.start()
 
     # spawn a pool of threads per PastieSite, and pass them a queue instance
     for site in yamlconfig['site']:
@@ -501,6 +515,52 @@ def downloadUrl(url, data=None, cookie=None):
 #        logger.error("ERROR: Other HTTPlib error.")
 #        return None, None
     # do NOT try to download the url again here, as we might end in enless loop
+
+
+class Sqlite3Database(threading.Thread):
+    def __init__(self, filename):
+        threading.Thread.__init__(self)
+        self.kill_received = False
+        self.queue = Queue.Queue()
+        self.filename = filename
+        self.db_conn = None
+
+    def run(self):
+        self.db_conn = sqlite3.connect(self.filename)  # TODO catch errors
+        # create the db if it doesn't exist
+        c = self.db_conn.cursor()
+        try:
+            # LATER maybe create a table per site. Lookups will be faster as less text-searching is needed
+            c.execute("CREATE TABLE IF NOT EXISTS pasties (site TEXT, id TEXT, md5 TEXT, date DATE)")
+            self.db_conn.commit()
+        except sqlite3.DatabaseError, e:
+            logger.error('Problem with the SQLite database {0}: {1}'.format(self.filename, e))
+            return None
+        # loop over the queue
+        while not self.kill_received:
+            try:
+                # grabs pastie from queue
+                pastie = self.queue.get()
+                # add the pastie to the DB
+                self.add(pastie)
+                # signals to queue job is done
+                self.queue.task_done()
+            # catch unknown errors
+            except:
+                logger.error("Thread for SQLite crashed unexpectectly, recovering...")
+
+    def add(self, pastie):
+        logger.debug('Added pastie {site} {id} in the SQLite database.'.format(site=pastie.site.name, id=pastie.id))
+        c = self.db_conn.cursor()
+        try:
+            data = (pastie.site.name,
+                    pastie.id,
+                    pastie.md5,
+                    datetime.now())
+            c.execute('INSERT INTO pasties VALUES (?, ?, ?, ?)', data)
+            self.db_conn.commit()
+        except sqlite3.DatabaseError, e:
+            logger.error('Cannot add pastie {site} {id} in the SQLite database: {error}'.format(site=pastie.site.name, id=pastie.id, error=e))
 
 
 def parseConfigFile(configfile):
