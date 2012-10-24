@@ -33,6 +33,7 @@ import random
 import json
 import gzip
 import sqlite3
+import hashlib
 from BeautifulSoup import BeautifulSoup
 from email.MIMEMultipart import MIMEMultipart
 from email.MIMEBase import MIMEBase
@@ -149,9 +150,16 @@ class Pastie():
         self.md5 = None
         self.url = self.site.download_url.format(id=self.id)
 
+    def hashPastie(self):
+        if self.pastie_content:
+            try:
+                self.md5 = hashlib.md5(self.pastie_content.encode('utf-8')).hexdigest()
+                logger.debug('Pastie {site} {id} has md5: "{md5}"'.format(site=self.site.name, id=self.id, md5=self.md5))
+            except:
+                logger.debug('Pastie {id} md5 fucked up'.format(id=self.id))
+
     def fetchPastie(self):
         self.pastie_content, headers = downloadUrl(self.url)
-        # FIXME take md5 of the downloaded file
         return self.pastie_content
 
     def savePastie(self, directory):
@@ -173,6 +181,8 @@ class Pastie():
         self.fetchPastie()
         # save the pastie on the disk
         if self.pastie_content:
+            # take checksum
+            self.hashPastie()
             # keep in memory that the pastie was seen successfully
             self.site.seenPastieAndRemember(self)
             # Save pastie to archive dir if configured

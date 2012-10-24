@@ -3,12 +3,12 @@ archive:
   save-all: yes          # Keep a copy of all pasties
   dir: "alerts"         # Directory where matching pasties should be kept
   dir-all: "archive"    # Directory where all pasties should be kept (if save-all is set to yes)
-  compress: yes          # Store the pasties compressed
+  compress: yes         # Store the pasties compressed
 
 db:
   sqlite3:              # Store information about the pastie in a database
-    enable: no         # Activate this DB engine   # NOT FULLY IMPLEMENTED
-    file: 'db.sqlite3' # The filename of the database
+    enable: no          # Activate this DB engine   # NOT FULLY IMPLEMENTED
+    file: 'db.sqlite3'  # The filename of the database
 
 email:
   alert: no             # Enable/disable email alerts
