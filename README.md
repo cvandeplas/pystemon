@@ -2,7 +2,7 @@ pystemon
 ========
 Monitoring tool for PasteBin-alike sites written in Python
 
-Copyleft GPLv3 - Christophe Vandeplas - christophe@vandeplas.com
+Copyleft GPLv3 - Christophe Vandeplas - christophe@vandeplas.com  
 Feel free to use the code, but please share the changes you've made
 
 Features:
@@ -32,13 +32,12 @@ Limitations:
 Usage: pystemon.py [options]
 -----
 Options:
-      -h, --help            show this help message and exit
-      -c FILE, --config=FILE
-                            load configuration from file
-      -d, --daemon          runs in background as a daemon (NOT IMPLEMENTED)
-      -s, --stats           display statistics about the running threads (NOT
-                            IMPLEMENTED)
-      -v                    outputs more information
-  
+      -h, --help            show this help message and exit  
+      -c FILE, --config=FILE  
+                            load configuration from file  
+      -d, --daemon          runs in background as a daemon (NOT IMPLEMENTED)  
+      -s, --stats           display statistics about the running threads (NOT IMPLEMENTED)    
+      -v                    outputs more information  
+
 Default configuration file: /etc/pystemon.yaml or pystemon.yaml in current directory
  
