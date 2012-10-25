@@ -15,6 +15,11 @@ email:
   from: alert@example.com
   to: alert@example.com
   server: 127.0.0.1
+#Set to your outgoing SMTP port 
+  port: 587
+#User/pass for authentication
+  username: 'username'
+  password: 'password'
   subject: '[pystemon] - {subject}'
 
 #####
