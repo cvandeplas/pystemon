@@ -280,7 +280,8 @@ The paste has also been attached to this email.
         msg.attach(part)
         # send out the mail
         try:
-            s = smtplib.SMTP(yamlconfig['email']['server'])
+            s = smtplib.SMTP(yamlconfig['email']['server'],yamlconfig['email']['port'])
+	    s.login(yamlconfig['email']['username'],yamlconfig['email']['password'])
             s.sendmail(yamlconfig['email']['from'], yamlconfig['email']['to'], msg.as_string())
             s.close()
         except smtplib.SMTPException:
