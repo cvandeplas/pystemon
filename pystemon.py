@@ -17,7 +17,6 @@ To be implemented:
 import optparse
 import logging.handlers
 import sys
-import yaml
 import threading
 import Queue
 from collections import deque
@@ -34,11 +33,19 @@ import json
 import gzip
 import sqlite3
 import hashlib
-from BeautifulSoup import BeautifulSoup
 from email.MIMEMultipart import MIMEMultipart
 from email.MIMEBase import MIMEBase
 from email.MIMEText import MIMEText
 from email import Encoders
+try:
+    from BeautifulSoup import BeautifulSoup
+except:
+    exit('ERROR: Cannot import the BeautifulSoup Python library. Are you sure you installed it?')
+try:
+    import yaml
+except:
+    exit('ERROR: Cannot import the yaml Python library. Are you sure you installed it?')
+
 socket.setdefaulttimeout(10)  # set a default timeout of 10 seconds to download the page (default = unlimited)
 
 
