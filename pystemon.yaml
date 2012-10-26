@@ -14,12 +14,10 @@ email:
   alert: no             # Enable/disable email alerts
   from: alert@example.com
   to: alert@example.com
-  server: 127.0.0.1
-#Set to your outgoing SMTP port 
-  port: 587
-#User/pass for authentication
-  username: 'username'
-  password: 'password'
+  server: 127.0.0.1     # Address of the server (hostname or IP)
+  port: 25              # Outgoing SMTP port: 25, 587, ...
+  username: ''          # (optional) Username for authentication. Leave blank for no authentication.
+  password: ''          # (optional) Password for authentication. Leave blank for no authentication.
   subject: '[pystemon] - {subject}'
 
 #####

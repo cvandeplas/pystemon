@@ -280,12 +280,15 @@ The paste has also been attached to this email.
         msg.attach(part)
         # send out the mail
         try:
-            s = smtplib.SMTP(yamlconfig['email']['server'],yamlconfig['email']['port'])
-	    s.login(yamlconfig['email']['username'],yamlconfig['email']['password'])
+            s = smtplib.SMTP(yamlconfig['email']['server'], yamlconfig['email']['port'])
+            if 'username' in yamlconfig['email'] and yamlconfig['email']['username']:
+                s.login(yamlconfig['email']['username'], yamlconfig['email']['password'])
             s.sendmail(yamlconfig['email']['from'], yamlconfig['email']['to'], msg.as_string())
             s.close()
-        except smtplib.SMTPException:
-            logger.error("unable to send email")
+        except smtplib.SMTPException, e:
+            logger.error("ERROR: unable to send email: {0}".format(e))
+        except:
+            logger.error("ERROR: unable to send email. Are your email setting correct?")
 
 
 class PastiePasteSiteCom(Pastie):
