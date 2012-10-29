@@ -28,6 +28,12 @@ search:
 #    search: ''         # The regular expression to search for
 #    count: ''          # (optional) How many hits should it have to be interesting?
 #    exclude: ''        # (optional) Do not alert if this regular expression matches
+#    regex-flags: ''    # (optional) Regular expression flags to give to the find function.
+#                       #            Default = re.IGNORECASE
+#                       #            Set to 0 to have no flags set
+#                       #            See http://docs.python.org/2/library/re.html#re.DEBUG for more info.
+#                       #            Warning: when setting this the default is overridden
+#                       #  example: 're.MULTILINE + re.DOTALL + re.IGNORECASE'
   - search: '[^a-zA-Z0-9]example\.com'
   - description: 'Download (non-porn)'
     search: 'download'

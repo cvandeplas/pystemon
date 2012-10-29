@@ -214,13 +214,17 @@ class Pastie():
             #    continue
 
             # LATER first compile regex, then search using compiled version
-            m = re.findall(regex['search'], self.pastie_content, re.IGNORECASE)
+            regex_flags = re.IGNORECASE
+            if 'regex-flags' in regex:
+                regex_flags = eval(regex['regex-flags'])
+            m = re.findall(regex['search'], self.pastie_content, regex_flags)
             if m:
+                # the regex matches the text
                 # ignore if not enough counts
                 if 'count' in regex and len(m) < regex['count']:
                     continue
                 # ignore if exclude
-                if 'exclude' in regex and re.search(regex['exclude'], self.pastie_content, re.IGNORECASE):
+                if 'exclude' in regex and re.search(regex['exclude'], self.pastie_content, regex_flags):
                     continue
                 # we have a match, add to match list
                 self.matches.append(regex)
