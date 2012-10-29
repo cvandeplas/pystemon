@@ -256,6 +256,15 @@ class Pastie():
         else:
             return ''
 
+    def matchesToRegex(self):
+        descriptions = []
+        for match in self.matches:
+            descriptions.append(match['search'])
+        if descriptions:
+            return unicode(descriptions)
+        else:
+            return ''
+
     def sendEmailAlert(self):
         msg = MIMEMultipart()
         alert = "Found hit for {matches} in pastie {url}".format(matches=self.matchesToText(), url=self.url)
@@ -269,12 +278,12 @@ I found a hit for a regular expression on one of the pastebin sites.
 
 The site where the paste came from :        {site}
 The original paste was located here:        {url}
-And the regular expression that matched:    {matches}
+And the regular expressions that matched:   {matches}
 The paste has also been attached to this email.
 
 # LATER below follows a small exerpt from the paste to give you direct context
 
-        '''.format(site=self.site.name, url=self.url, matches=self.matches)
+        '''.format(site=self.site.name, url=self.url, matches=self.matchesToRegex())
         msg.attach(MIMEText(message))
         # original paste as attachment
         part = MIMEBase('application', "octet-stream")
