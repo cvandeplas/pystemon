@@ -87,8 +87,8 @@ class PastieSite(threading.Thread):
                     for pastie in reversed(last_pasties):
                         queues[self.name].put(pastie)  # add pastie to queue
             # catch unknown errors
-            except:
-                logger.error("Thread for {name} crashed unexpectectly, recovering...".format(name=self.name))
+            except Exception, e:
+                logger.error("Thread for {name} crashed unexpectectly, recovering...: {e}".format(name=self.name, e=e))
             time.sleep(sleep_time)
 
     def getLastPasties(self):
@@ -166,8 +166,8 @@ class Pastie():
             try:
                 self.md5 = hashlib.md5(self.pastie_content.encode('utf-8')).hexdigest()
                 logger.debug('Pastie {site} {id} has md5: "{md5}"'.format(site=self.site.name, id=self.id, md5=self.md5))
-            except:
-                logger.debug('Pastie {id} md5 fucked up'.format(id=self.id))
+            except Exception, e:
+                logger.error('Pastie {site} {id} md5 problem: {e}'.format(site=self.site.name, id=self.id, e=e))
 
     def fetchPastie(self):
         self.pastie_content, headers = downloadUrl(self.url)
@@ -300,8 +300,8 @@ The paste has also been attached to this email.
             s.close()
         except smtplib.SMTPException, e:
             logger.error("ERROR: unable to send email: {0}".format(e))
-        except:
-            logger.error("ERROR: unable to send email. Are your email setting correct?")
+        except Exception, e:
+            logger.error("ERROR: unable to send email. Are your email setting correct?: {e}".format(e=e))
 
 
 class PastiePasteSiteCom(Pastie):
@@ -385,7 +385,7 @@ class ThreadPasties(threading.Thread):
 
     def run(self):
         while not self.kill_received:
-            #try:
+            try:
                 # grabs pastie from queue
                 pastie = self.queue.get()
                 pastie_content = pastie.fetchAndProcessPastie()
@@ -398,8 +398,8 @@ class ThreadPasties(threading.Thread):
                 # signals to queue job is done
                 self.queue.task_done()
             # catch unknown errors
-            #except:
-            #    logger.error("ThreadPasties for {name} crashed unexpectectly, recovering...".format(name=self.name))
+            except Exception, e:
+                logger.error("ThreadPasties for {name} crashed unexpectectly, recovering...: {e}".format(name=self.name, e=e))
 
 
 def main():
@@ -462,8 +462,8 @@ def loadUserAgentsFromFile(filename):
     global user_agents_list
     try:
         f = open(filename)
-    except:
-        logger.error('Configuration problem: user-agent-file "{file}" not found or not readable.'.format(file=filename))
+    except Exception, e:
+        logger.error('Configuration problem: user-agent-file "{file}" not found or not readable: {e}'.format(file=filename, e=e))
     for line in f:
         line = line.strip()
         if line:
@@ -487,8 +487,8 @@ def loadProxiesFromFile(filename):
     global proxies_list
     try:
         f = open(filename)
-    except:
-        logger.error('Configuration problem: proxyfile "{file}" not found or not readable.'.format(file=filename))
+    except Exception, e:
+        logger.error('Configuration problem: proxyfile "{file}" not found or not readable: {e}'.format(file=filename, e=e))
     for line in f:
         line = line.strip()
         if line:  # LATER verify if the proxy line has the correct structure
@@ -573,9 +573,9 @@ def downloadUrl(url, data=None, cookie=None):
             failedProxy(random_proxy)
             logger.warning("Failed to download the page because of proxy error {0} trying again.".format(url))
             return downloadUrl(url)
-#    except:
-#        logger.error("ERROR: Other HTTPlib error.")
-#        return None, None
+    except Exception, e:
+        logger.error("ERROR: Other HTTPlib error: {e}".format(e=e))
+        return None, None
     # do NOT try to download the url again here, as we might end in enless loop
 
 
@@ -618,8 +618,8 @@ class Sqlite3Database(threading.Thread):
                 # signals to queue job is done
                 self.queue.task_done()
             # catch unknown errors
-            except:
-                logger.error("Thread for SQLite crashed unexpectectly, recovering...")
+            except Exception, e:
+                logger.error("Thread for SQLite crashed unexpectectly, recovering...: {e}".format(e=e))
 
     def addOrUpdate(self, pastie):
         data = {'site': pastie.site.name,
