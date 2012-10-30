@@ -573,6 +573,7 @@ def downloadUrl(url, data=None, cookie=None):
             failedProxy(random_proxy)
             logger.warning("Failed to download the page because of proxy error {0} trying again.".format(url))
             return downloadUrl(url)
+        return None, None
     except Exception, e:
         logger.error("ERROR: Other HTTPlib error: {e}".format(e=e))
         return None, None
