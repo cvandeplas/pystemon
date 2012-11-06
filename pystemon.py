@@ -289,7 +289,7 @@ The paste has also been attached to this email.
         part = MIMEBase('application', "octet-stream")
         part.set_payload(self.pastie_content)
         Encoders.encode_base64(part)
-        part.add_header('Content-Disposition', 'attachment; filename="%s"' % self.id)
+	part.add_header('Content-Disposition', 'attachment; filename="%s%s"' % (self.id, yamlconfig['email']['extension']))
         msg.attach(part)
         # send out the mail
         try:
