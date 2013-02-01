@@ -46,6 +46,13 @@ try:
 except:
     exit('ERROR: Cannot import the yaml Python library. Are you sure you installed it?')
 
+try:
+    if sys.version_info < (2, 7):
+        exit('You need python version 2.7 or newer.')
+except:
+    exit('You need python version 2.7 or newer.')
+
+
 socket.setdefaulttimeout(10)  # set a default timeout of 10 seconds to download the page (default = unlimited)
 
 
