@@ -228,7 +228,7 @@ class Pastie():
             if m:
                 # the regex matches the text
                 # ignore if not enough counts
-                if 'count' in regex and len(m) < regex['count']:
+                if 'count' in regex and len(m) < int(regex['count']):
                     continue
                 # ignore if exclude
                 if 'exclude' in regex and re.search(regex['exclude'], self.pastie_content, regex_flags):
