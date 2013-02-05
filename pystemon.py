@@ -40,7 +40,7 @@ from email import Encoders
 try:
     from BeautifulSoup import BeautifulSoup
 except:
-    exit('ERROR: Cannot import the BeautifulSoup Python library. Are you sure you installed it?')
+    exit('ERROR: Cannot import the BeautifulSoup 3 Python library. Are you sure you installed it? (apt-get install python-beautifulsoup')
 try:
     import yaml
 except:
