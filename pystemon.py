@@ -348,13 +348,11 @@ class PastieCdvLt(Pastie):
     def fetchPastie(self):
         downloaded_page, headers = downloadUrl(self.url)
         if downloaded_page:
-            # make the json valid: strip json1(  )
-            downloaded_page = u'[' + downloaded_page[6:-2] + u']'
             # convert to json object
             json_pastie = json.loads(downloaded_page)
             if json_pastie:
                 # and extract the code
-                self.pastie_content = json_pastie[0]['code_record']
+                self.pastie_content = json_pastie['snippet']['snippetData']
         return self.pastie_content
 
 
