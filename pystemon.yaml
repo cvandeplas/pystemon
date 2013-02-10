@@ -97,11 +97,11 @@ site:
     archive-regex: '<a href="http://codepad.org/([a-zA-Z0-9]+)">view'
     download-url: 'http://codepad.org/{id}/raw.txt'
     
-#  cdv.lt:  # FIXME write custom class to extract data from textarea
-#    pastie-classname: PastieCdvLt
-#    archive-url: 'http://cdv.lt/snippets'
-#    archive-regex: '<a href="/cv/([a-zA-Z0-9]+)">'
-#    download-url: 'http://cdv.lt/getData?sn={id}&callback=json1'
+  cdv.lt:  # FIXME write custom class to extract data from textarea
+    pastie-classname: PastieCdvLt
+    archive-url: 'http://cdv.lt/snippets'
+    archive-regex: '<a href="/([a-zA-Z0-9]+)">'
+    download-url: 'http://cdv.lt/api/snippet/{id}'
 #
   snipt.net:
     pastie-classname: PastieSniptNet
