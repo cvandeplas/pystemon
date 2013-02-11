@@ -19,6 +19,8 @@ email:
   username: ''          # (optional) Username for authentication. Leave blank for no authentication.
   password: ''          # (optional) Password for authentication. Leave blank for no authentication.
   subject: '[pystemon] - {subject}'
+###add an extension to the email attachment, blank for none  ex:  '.txt'
+  extension: ''
 
 #####
 # Definition of regular expressions to search for in the pasties
