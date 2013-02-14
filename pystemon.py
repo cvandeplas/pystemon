@@ -3,8 +3,8 @@
 
 '''
 @author:     Christophe Vandeplas <christophe@vandeplas.com>
-@copyright:  GPLv3
-Feel free to use the code, but please share the changes you've made
+@copyright:  AGPLv3 
+             http://www.gnu.org/licenses/agpl.html
 
 To be implemented:
 - FIXME set all the config options in the class variables

@@ -2,7 +2,7 @@ pystemon
 ========
 Monitoring tool for PasteBin-alike sites written in Python
 
-Copyleft GPLv3 - Christophe Vandeplas - christophe@vandeplas.com  
+Copyleft AGPLv3 - Christophe Vandeplas - christophe@vandeplas.com  
 Feel free to use the code, but please share the changes you've made
 
 Features:
