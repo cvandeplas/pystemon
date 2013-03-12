@@ -33,6 +33,7 @@ import json
 import gzip
 import sqlite3
 import hashlib
+import traceback
 from email.MIMEMultipart import MIMEMultipart
 from email.MIMEBase import MIMEBase
 from email.MIMEText import MIMEText
@@ -96,6 +97,7 @@ class PastieSite(threading.Thread):
             # catch unknown errors
             except Exception, e:
                 logger.error("Thread for {name} crashed unexpectectly, recovering...: {e}".format(name=self.name, e=e))
+                logger.debug(traceback.format_exc())
             time.sleep(sleep_time)
 
     def getLastPasties(self):
@@ -405,6 +407,7 @@ class ThreadPasties(threading.Thread):
             # catch unknown errors
             except Exception, e:
                 logger.error("ThreadPasties for {name} crashed unexpectectly, recovering...: {e}".format(name=self.name, e=e))
+                logger.debug(traceback.format_exc())
 
 
 def main():
@@ -626,6 +629,7 @@ class Sqlite3Database(threading.Thread):
             # catch unknown errors
             except Exception, e:
                 logger.error("Thread for SQLite crashed unexpectectly, recovering...: {e}".format(e=e))
+                logger.debug(traceback.format_exc())
 
     def addOrUpdate(self, pastie):
         data = {'site': pastie.site.name,
