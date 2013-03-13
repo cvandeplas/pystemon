@@ -31,7 +31,6 @@ import smtplib
 import random
 import json
 import gzip
-import sqlite3
 import hashlib
 import traceback
 from email.MIMEMultipart import MIMEMultipart
@@ -420,6 +419,11 @@ def main():
     # start a thread to handle the DB data
     db = None
     if yamlconfig['db'] and yamlconfig['db']['sqlite3'] and yamlconfig['db']['sqlite3']['enable']:
+        try:
+            global sqlite3
+            import sqlite3
+        except:
+            exit('ERROR: Cannot import the sqlite3 Python library. Are you sure it is compiled in python?')
         db = Sqlite3Database(yamlconfig['db']['sqlite3']['file'])
         db.setDaemon(True)
         threads.append(db)
