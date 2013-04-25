@@ -728,7 +728,10 @@ if __name__ == "__main__":
 
     logger = logging.getLogger('pystemon')
     logger.setLevel(logging.INFO)
-    logger.addHandler(logging.StreamHandler(sys.stdout))
+    hdlr = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter('[%(asctime)s] %(message)s')
+    hdlr.setFormatter(formatter)
+    logger.addHandler(hdlr)
     if options.verbose:
         logger.setLevel(logging.DEBUG)
 
