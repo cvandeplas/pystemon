@@ -35,6 +35,7 @@ search:
 #                       #            Warning: when setting this the default is overridden
 #                       #  example: 're.MULTILINE + re.DOTALL + re.IGNORECASE'
   - search: '[^a-zA-Z0-9]example\.com'
+  - search: '[^a-zA-Z0-9]foobar\.com'
   - description: 'Download (non-porn)'
     search: 'download'
     exclude: 'porn|sex|teen'
