@@ -1,3 +1,6 @@
+#network:		# Network settings
+#  ip: '1.1.1.1'	# Specify source IP address if you want to bind on a specific one
+
 archive:
   save: yes             # Keep 
   save-all: yes          # Keep a copy of all pasties
@@ -66,7 +69,7 @@ site:
     download-url: 'http://pastebin.com/raw.php?i={id}'
     update-max: 40
     update-min: 30
-
+ 
   pastie.org:
     archive-url: 'http://pastie.org/pastes'
     archive-regex: '<a href="http://pastie.org/pastes/(\d{7})">'
