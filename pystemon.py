@@ -175,6 +175,16 @@ class PastieSite(threading.Thread):
             filename = filename + ".gz"
         return filename
 
+def verifyDirectoryExists(directory):
+    d     = datetime.now()
+    year  = str(d.year)
+    month = str(d.month)
+    day   = str(d.day)
+    fullpath = directory + os.sep + year + os.sep + month + os.sep + day
+    if not os.path.isdir(fullpath):	
+	os.makedirs(fullpath)
+    return fullpath
+
 
 class Pastie():
     def __init__(self, site, pastie_id):
@@ -200,7 +210,7 @@ class Pastie():
     def savePastie(self, directory):
         if not self.pastie_content:
             raise SystemExit('BUG: Content not set, sannot save')
-        full_path = directory + os.sep + self.site.pastieIdToFilename(self.id)
+        full_path = verifyDirectoryExists(directory) + os.sep + self.site.pastieIdToFilename(self.id)
         if self.site.archive_compress:
             with gzip.open(full_path, 'w') as f:
                 f.write(self.pastie_content.encode('utf8'))  # TODO error checking
