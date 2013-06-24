@@ -54,7 +54,16 @@ except:
 
 
 socket.setdefaulttimeout(10)  # set a default timeout of 10 seconds to download the page (default = unlimited)
+true_socket = socket.socket
 
+
+def make_bound_socket(source_ip):
+    def bound_socket(*a, **k):
+	sock = true_socket(*a, **k)
+	sock.bind((source_ip, 0))
+	return sock
+    return bound_socket
+	
 
 class PastieSite(threading.Thread):
     '''
@@ -69,7 +78,14 @@ class PastieSite(threading.Thread):
         self.download_url = download_url
         self.archive_url = archive_url
         self.archive_regex = archive_regex
-        self.save_dir = yamlconfig['archive']['dir'] + os.sep + name
+	try: 
+	    self.ip_addr = yamlconfig['network']['ip']
+            true_socket = socket.socket
+	    socket.socket = make_bound_socket(self.ip_addr)
+	except:
+	    print "Using default IP address"
+
+	self.save_dir = yamlconfig['archive']['dir'] + os.sep + name
         self.archive_dir = yamlconfig['archive']['dir-all'] + os.sep + name
         if yamlconfig['archive']['save'] and not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
@@ -104,7 +120,7 @@ class PastieSite(threading.Thread):
         pasties = []
         # populate queue with data
         htmlPage, headers = downloadUrl(self.archive_url)
-        if not htmlPage:
+	if not htmlPage:
             logger.warning("No HTML content for page {url}".format(url=self.archive_url))
             return False
         pasties_ids = re.findall(self.archive_regex, htmlPage)
