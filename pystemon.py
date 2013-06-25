@@ -150,7 +150,7 @@ class PastieSite(threading.Thread):
         # look on the filesystem.  # LATER remove this filesystem lookup as it will give problems on long term
         if yamlconfig['archive']['save-all']:
             # check if the pastie was already saved on the disk
-            if os.path.exists(self.archive_dir + os.sep + self.pastieIdToFilename(pastie_id)):
+            if os.path.exists(verifyDirectoryExists(self.archive_dir) + os.sep + self.pastieIdToFilename(pastie_id)):
                 return True
         # TODO look in the database if it was already seen
 
