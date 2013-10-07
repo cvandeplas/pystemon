@@ -214,10 +214,10 @@ class Pastie():
         full_path = verifyDirectoryExists(directory) + os.sep + self.site.pastieIdToFilename(self.id)
         if self.site.archive_compress:
             with gzip.open(full_path, 'w') as f:
-                f.write(self.pastie_content.encode('utf8'))  # TODO error checking
+                f.write(self.pastie_content.encode('utf8'))
         else:
             with open(full_path, 'w') as f:
-                f.write(self.pastie_content.encode('utf8'))  # TODO error checking
+                f.write(self.pastie_content.encode('utf8'))
 
     def fetchAndProcessPastie(self):
         # double check if the pastie was already downloaded, and remember that we've seen it
@@ -244,10 +244,6 @@ class Pastie():
             return False
         # search for the regexes in the htmlPage
         for regex in yamlconfig['search']:
-            #if not 'search' in regex: # TODO move this in the configuration file validation
-            #    logger.warning('No search key in configuration: {0}'.format(regex))
-            #    continue
-
             # LATER first compile regex, then search using compiled version
             regex_flags = re.IGNORECASE
             if 'regex-flags' in regex:
