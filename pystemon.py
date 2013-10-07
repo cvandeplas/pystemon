@@ -593,7 +593,7 @@ def downloadUrl(url, data=None, cookie=None):
         htmlPage = unicode(response.read(), errors='replace')
         # If we receive a "slow down" message, follow Pastebin recommendation!
         if 'Please slow down' in htmlPage:
-            logger.warning("Slow down message received. Waiting 5 seconds")
+            logger.warning("Slow down message received for {url}. Waiting 5 seconds".format(url))
             time.sleep(5)
             return downloadUrl(url)
         return htmlPage, response.headers
