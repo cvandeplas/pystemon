@@ -37,6 +37,8 @@ search:
 #                       #            See http://docs.python.org/2/library/re.html#re.DEBUG for more info.
 #                       #            Warning: when setting this the default is overridden
 #                       #  example: 're.MULTILINE + re.DOTALL + re.IGNORECASE'
+#    to: ''             # (optional) Additional recipients for email alert, comma separated list
+
   - search: '[^a-zA-Z0-9]example\.com'
   - search: '[^a-zA-Z0-9]foobar\.com'
   - description: 'Download (non-porn)'

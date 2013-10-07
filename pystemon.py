@@ -306,7 +306,13 @@ class Pastie():
         # headers
         msg['Subject'] = yamlconfig['email']['subject'].format(subject=alert)
         msg['From'] = yamlconfig['email']['from']
-        msg['To'] = yamlconfig['email']['to']
+        # build the list of recipients
+        recipients = []
+        recipients.append(yamlconfig['email']['to'])  # first the global alert email
+        for match in self.matches:                    # per match, the custom additional email
+            if 'to' in match and match['to']:
+                recipients.extend(match['to'].split(","))
+        msg['To'] = ','.join(recipients)  # here the list needs to be comma separated
         # message body
         message = '''
 I found a hit for a regular expression on one of the pastebin sites.
@@ -329,9 +335,11 @@ The paste has also been attached to this email.
         # send out the mail
         try:
             s = smtplib.SMTP(yamlconfig['email']['server'], yamlconfig['email']['port'])
+            # login to the SMTP server if configured
             if 'username' in yamlconfig['email'] and yamlconfig['email']['username']:
                 s.login(yamlconfig['email']['username'], yamlconfig['email']['password'])
-            s.sendmail(yamlconfig['email']['from'], yamlconfig['email']['to'], msg.as_string())
+            # send the mail
+            s.sendmail(yamlconfig['email']['from'], recipients, msg.as_string())
             s.close()
         except smtplib.SMTPException, e:
             logger.error("ERROR: unable to send email: {0}".format(e))
