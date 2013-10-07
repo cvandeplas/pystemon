@@ -3,7 +3,7 @@
 
 archive:
   save: yes             # Keep 
-  save-all: yes          # Keep a copy of all pasties
+  save-all: no          # Keep a copy of all pasties
   dir: "alerts"         # Directory where matching pasties should be kept
   dir-all: "archive"    # Directory where all pasties should be kept (if save-all is set to yes)
   compress: yes         # Store the pasties compressed
@@ -111,9 +111,7 @@ site:
 
   snipt.net:
     pastie-classname: PastieSniptNet
-    #archive-url: 'https://snipt.net/'
-    #archive-regex: '<h1><a href="/([a-zA-Z0-9-_/]+)/">'
-    archive-url: 'https://snipt.net/?rss'
+    archive-url: 'https://snipt.net/public/?rss'
     archive-regex: '<link>https://snipt.net/(.+)/</link>'
     download-url: 'https://snipt.net/{id}/'
 
