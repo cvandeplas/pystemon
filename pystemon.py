@@ -102,13 +102,16 @@ class PastieSite(threading.Thread):
             try:
                 sleep_time = random.randint(self.update_min, self.update_max)
                 # grabs site from queue
-                logger.info("Downloading pasties from {name}. Next download scheduled in {time} seconds".format(name=self.name, time=sleep_time))
+                logger.info("Checking for new pasties from {name}. Next download scheduled in {time} seconds".format(name=self.name, time=sleep_time))
                 # get the list of last pasties, but reverse it so we first have the old
                 # entries and then the new ones
                 last_pasties = self.getLastPasties()
                 if last_pasties:
                     for pastie in reversed(last_pasties):
                         queues[self.name].put(pastie)  # add pastie to queue
+                    logger.info("Found {amount} new pasties for site {site}. There are now {qsize} pasties to be downloaded.".format(amount=len(last_pasties),
+                                                                                                          site=self.name,
+                                                                                                          qsize=queues[self.name].qsize()))
             # catch unknown errors
             except Exception, e:
                 logger.error("Thread for {name} crashed unexpectectly, recovering...: {e}".format(name=self.name, e=e))
@@ -137,7 +140,6 @@ class PastieSite(threading.Thread):
                 else:
                     pastie = Pastie(self, pastie_id)
                 pasties.append(pastie)
-            logger.info("Found {amount} new pasties for site {site}".format(amount=len(pasties), site=self.name))
             return pasties
         logger.error("No last pasties matches for regular expression site:{site} regex:{regex}. Error in your regex? Dumping htmlPage \n {html}".format(site=self.name, regex=self.archive_regex, html=htmlPage.encode('utf8')))
         return False
