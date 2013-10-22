@@ -77,10 +77,11 @@ site:
     archive-regex: '<a href="http://pastie.org/pastes/(\d{7})">'
     download-url: 'http://pastie.org/pastes/{id}/text'
 
-  nopaste.me:
-    archive-url: 'http://nopaste.me/recent' 
-    archive-regex: '<a href="http://nopaste.me/paste/([a-zA-Z0-9]+)">'
-    download-url: 'http://nopaste.me/download/{id}.txt'
+# Site seems offline now
+#  nopaste.me:
+#    archive-url: 'http://nopaste.me/recent' 
+#    archive-regex: '<a href="http://nopaste.me/paste/([a-zA-Z0-9]+)">'
+#    download-url: 'http://nopaste.me/download/{id}.txt'
 
   slexy.org:
     archive-url: 'http://slexy.org/recent' 
