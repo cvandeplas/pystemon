@@ -83,7 +83,7 @@ class PastieSite(threading.Thread):
             true_socket = socket.socket
             socket.socket = make_bound_socket(self.ip_addr)
         except:
-            print "Using default IP address"
+            logger.debug("Using default IP address")
 
         self.save_dir = yamlconfig['archive']['dir'] + os.sep + name
         self.archive_dir = yamlconfig['archive']['dir-all'] + os.sep + name
@@ -115,7 +115,7 @@ class PastieSite(threading.Thread):
             # catch unknown errors
             except Exception, e:
                 logger.error("Thread for {name} crashed unexpectectly, recovering...: {e}".format(name=self.name, e=e))
-                logger.debug(traceback.format_exc())
+                logger.error(traceback.format_exc())
             time.sleep(sleep_time)
 
     def getLastPasties(self):
@@ -439,7 +439,8 @@ class ThreadPasties(threading.Thread):
             # catch unknown errors
             except Exception, e:
                 logger.error("ThreadPasties for {name} crashed unexpectectly, recovering...: {e}".format(name=self.name, e=e))
-                logger.debug(traceback.format_exc())
+                logger.error("    pastie from {0} with id {1}".format(self.name, pastie.id))
+                logger.error(traceback.format_exc())
 
 
 def main():
