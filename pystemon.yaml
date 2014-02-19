@@ -69,8 +69,8 @@ site:
     archive-url: 'http://pastebin.com/archive'
     archive-regex: '<a href="/(\w{8})">.+</a></td>'
     download-url: 'http://pastebin.com/raw.php?i={id}'
-    update-max: 40
-    update-min: 30
+    update-max: 50
+    update-min: 40
  
   pastie.org:
     archive-url: 'http://pastie.org/pastes'

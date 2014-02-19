@@ -605,8 +605,8 @@ def downloadUrl(url, data=None, cookie=None):
         if 403 == e.code:
             htmlPage = e.read()
             if 'Please slow down' in htmlPage or 'has temporarily blocked your computer' in htmlPage:
-                logger.warning("Slow down message received for {url}. Waiting 5 seconds".format(url=url))
-                time.sleep(5)
+                logger.warning("Slow down message received for {url}. Waiting 1 minute".format(url=url))
+                time.sleep(60)
                 return downloadUrl(url)
         logger.warning("ERROR: HTTP Error ##### {e} ######################## {url}".format(e=e, url=url))
         return None, None
