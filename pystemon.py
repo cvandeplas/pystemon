@@ -599,13 +599,16 @@ def downloadUrl(url, data=None, cookie=None):
             response = opener.open(url)
         htmlPage = unicode(response.read(), errors='replace')
         # If we receive a "slow down" message, follow Pastebin recommendation!
-        if 'Please slow down' in htmlPage:
-            logger.warning("Slow down message received for {url}. Waiting 5 seconds".format(url))
-            time.sleep(5)
-            return downloadUrl(url)
+        
         return htmlPage, response.headers
-    except urllib2.HTTPError:
-        logger.warning("ERROR: HTTP Error ############################# " + url)
+    except urllib2.HTTPError, e:
+        if 403 == e.code:
+            htmlPage = e.read()
+            if 'Please slow down' in htmlPage or 'has temporarily blocked your computer' in htmlPage:
+                logger.warning("Slow down message received for {url}. Waiting 5 seconds".format(url=url))
+                time.sleep(5)
+                return downloadUrl(url)
+        logger.warning("ERROR: HTTP Error ##### {e} ######################## {url}".format(e=e, url=url))
         return None, None
     except urllib2.URLError:
         logger.debug("ERROR: URL Error ############################# " + url)
