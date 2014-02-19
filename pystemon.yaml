@@ -104,11 +104,12 @@ site:
     archive-regex: '<a href="http://codepad.org/([a-zA-Z0-9]+)">view'
     download-url: 'http://codepad.org/{id}/raw.txt'
     
-  cdv.lt:
-    pastie-classname: PastieCdvLt
-    archive-url: 'http://cdv.lt/snippets'
-    archive-regex: '<a href="/([a-zA-Z0-9]+)">[0-9]'
-    download-url: 'http://cdv.lt/api/snippet/{id}'
+# Site seems offline now
+#  cdv.lt:
+#    pastie-classname: PastieCdvLt
+#    archive-url: 'http://cdv.lt/snippets'
+#    archive-regex: '<a href="/([a-zA-Z0-9]+)">[0-9]'
+#    download-url: 'http://cdv.lt/api/snippet/{id}'
 
   snipt.net:
     pastie-classname: PastieSniptNet
