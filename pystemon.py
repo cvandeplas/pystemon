@@ -598,8 +598,6 @@ def downloadUrl(url, data=None, cookie=None):
         else:
             response = opener.open(url)
         htmlPage = unicode(response.read(), errors='replace')
-        # If we receive a "slow down" message, follow Pastebin recommendation!
-        
         return htmlPage, response.headers
     except urllib2.HTTPError, e:
         if 403 == e.code:
@@ -610,12 +608,17 @@ def downloadUrl(url, data=None, cookie=None):
                 return downloadUrl(url)
         logger.warning("ERROR: HTTP Error ##### {e} ######################## {url}".format(e=e, url=url))
         return None, None
-    except urllib2.URLError:
-        logger.debug("ERROR: URL Error ############################# " + url)
+    except urllib2.URLError, e:
+        logger.debug("ERROR: URL Error ##### {e} ######################## ".format(e=e, url=url))
         if random_proxy:  # remove proxy from the list if needed
             failedProxy(random_proxy)
             logger.warning("Failed to download the page because of proxy error {0} trying again.".format(url))
             return downloadUrl(url)
+        if 'timed out' in e.reason:
+            logger.warning("Timed out or slow down for {url}. Waiting 1 minute".format(url=url))
+            time.sleep(60)
+            return downloadUrl(url)
+        return None, None
     except socket.timeout:
         logger.debug("ERROR: timeout ############################# " + url)
         if random_proxy:  # remove proxy from the list if needed
