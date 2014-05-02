@@ -182,7 +182,12 @@ def verifyDirectoryExists(directory):
     d = datetime.now()
     year = str(d.year)
     month = str(d.month)
+    # prefix month and day with "0" if it is only one digit
+    if len(month) < 2:
+        month = "0" + month
     day = str(d.day)
+    if len(day) < 2:
+        day = "0" + day
     fullpath = directory + os.sep + year + os.sep + month + os.sep + day
     if not os.path.isdir(fullpath):
         os.makedirs(fullpath)
@@ -311,7 +316,7 @@ class Pastie():
             if 'to' in match and match['to']:
                 recipients.extend(match['to'].split(","))
         msg['To'] = ','.join(recipients)  # here the list needs to be comma separated
-        # message body
+        # message body including full paste rather than attaching it
         message = '''
 I found a hit for a regular expression on one of the pastebin sites.
 
@@ -320,16 +325,18 @@ The original paste was located here:        {url}
 And the regular expressions that matched:   {matches}
 The paste has also been attached to this email.
 
-# LATER below follows a small exerpt from the paste to give you direct context
+Below (after newline) is the content of the pastie:
 
-        '''.format(site=self.site.name, url=self.url, matches=self.matchesToRegex())
+{content}
+
+        '''.format(site=self.site.name, url=self.url, matches=self.matchesToRegex(), content=self.pastie_content)
         msg.attach(MIMEText(message))
         # original paste as attachment
-        part = MIMEBase('application', "octet-stream")
-        part.set_payload(self.pastie_content)
-        Encoders.encode_base64(part)
-        part.add_header('Content-Disposition', 'attachment; filename="%s.txt"' % (self.id))
-        msg.attach(part)
+        #part = MIMEBase('application', "octet-stream")
+        #part.set_payload(self.pastie_content, charset='utf-8')
+        #Encoders.encode_base64(part)
+        #part.add_header('Content-Disposition', 'attachment; filename="%s.txt"' % (self.id))
+        #msg.attach(part)
         # send out the mail
         try:
             s = smtplib.SMTP(yamlconfig['email']['server'], yamlconfig['email']['port'])
@@ -554,7 +561,7 @@ def getRandomProxy():
 
 def failedProxy(proxy):
     proxies_failed.append(proxy)
-    if proxies_failed.count(proxy) >= 5 and proxies_list.count(proxy) >= 1:
+    if proxies_failed.count(proxy) >= 2 and proxies_list.count(proxy) >= 1:
         logger.info("Removing proxy {0} from proxy list because of to many errors errors.".format(proxy))
         proxies_lock.acquire()
         proxies_list.remove(proxy)
@@ -574,7 +581,10 @@ class NoRedirectHandler(urllib2.HTTPRedirectHandler):
     http_error_301 = http_error_303 = http_error_307 = http_error_302
 
 
-def downloadUrl(url, data=None, cookie=None):
+def downloadUrl(url, data=None, cookie=None, loop=0):
+    # Retry count: if more than 5 recursions, give up on URL (used for the 404 case)
+    if loop > 5:
+        return None, None
     try:
         opener = None
         # Random Proxy if set in config
@@ -600,9 +610,33 @@ def downloadUrl(url, data=None, cookie=None):
         htmlPage = unicode(response.read(), errors='replace')
         return htmlPage, response.headers
     except urllib2.HTTPError, e:
+        failedProxy(random_proxy)
+        logger.warning("!!Proxy error on {0}.".format(url))
+        print e.code
+        if 404 == e.code:
+            htmlPage = e.read()
+            logger.warning("404 from proxy received for {url}. Waiting 1 minute".format(url=url))
+            time.sleep(60)
+            loop += 1
+            return downloadUrl(url, loop=loop)
+        if 500 == e.code:
+            htmlPage = e.read()
+            logger.warning("500 from proxy received for {url}. Waiting 1 minute".format(url=url))
+            time.sleep(60)
+            return downloadUrl(url)
+        if 504 == e.code:
+            htmlPage = e.read()
+            logger.warning("504 from proxy received for {url}. Waiting 1 minute".format(url=url))
+            time.sleep(60)
+            return downloadUrl(url)
+        if 502 == e.code:
+            htmlPage = e.read()
+            logger.warning("502 from proxy received for {url}. Waiting 1 minute".format(url=url))
+            time.sleep(60)
+            return downloadUrl(url)
         if 403 == e.code:
             htmlPage = e.read()
-            if 'Please slow down' in htmlPage or 'has temporarily blocked your computer' in htmlPage:
+            if 'Please slow down' in htmlPage or 'has temporarily blocked your computer' in htmlPage or 'blocked' in htmlPage:
                 logger.warning("Slow down message received for {url}. Waiting 1 minute".format(url=url))
                 time.sleep(60)
                 return downloadUrl(url)
@@ -610,6 +644,7 @@ def downloadUrl(url, data=None, cookie=None):
         return None, None
     except urllib2.URLError, e:
         logger.debug("ERROR: URL Error ##### {e} ######################## ".format(e=e, url=url))
+        print e
         if random_proxy:  # remove proxy from the list if needed
             failedProxy(random_proxy)
             logger.warning("Failed to download the page because of proxy error {0} trying again.".format(url))
@@ -627,8 +662,11 @@ def downloadUrl(url, data=None, cookie=None):
             return downloadUrl(url)
         return None, None
     except Exception, e:
-        logger.error("ERROR: Other HTTPlib error: {e}".format(e=e))
-        return None, None
+        failedProxy(random_proxy)
+        logger.warning("Failed to download the page because of other HTTPlib error proxy error {0} trying again.".format(url))
+        return downloadUrl(url)
+        #logger.error("ERROR: Other HTTPlib error: {e}".format(e=e))
+        #return None, None
     # do NOT try to download the url again here, as we might end in enless loop
 
 
