@@ -52,6 +52,8 @@ try:
 except:
     exit('You need python version 2.7 or newer.')
 
+retries_client = 5
+retries_server = 100
 
 socket.setdefaulttimeout(10)  # set a default timeout of 10 seconds to download the page (default = unlimited)
 true_socket = socket.socket
@@ -574,9 +576,12 @@ class NoRedirectHandler(urllib2.HTTPRedirectHandler):
     http_error_301 = http_error_303 = http_error_307 = http_error_302
 
 
-def downloadUrl(url, data=None, cookie=None, loop=0):
-    # Retry count: if more than 5 recursions, give up on URL (used for the 404 case)
-    if loop > 5:
+def downloadUrl(url, data=None, cookie=None, loop_client=0, loop_server=0):
+    # Client errors (40x): if more than 5 recursions, give up on URL (used for the 404 case)
+    if loop_client > retries_client:
+        return None, None
+    # Server errors (50x): if more than 100 recursions, give up on URL
+    if loop_server > retries_server:
         return None, None
     try:
         opener = None
@@ -605,28 +610,34 @@ def downloadUrl(url, data=None, cookie=None, loop=0):
     except urllib2.HTTPError, e:
         failedProxy(random_proxy)
         logger.warning("!!Proxy error on {0}.".format(url))
-        print e.code
         if 404 == e.code:
             htmlPage = e.read()
             logger.warning("404 from proxy received for {url}. Waiting 1 minute".format(url=url))
             time.sleep(60)
-            loop += 1
-            return downloadUrl(url, loop=loop)
+            loop_client += 1
+            logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_client, total=retries_client, url=url))
+            return downloadUrl(url, loop_client=loop_client)
         if 500 == e.code:
             htmlPage = e.read()
             logger.warning("500 from proxy received for {url}. Waiting 1 minute".format(url=url))
             time.sleep(60)
-            return downloadUrl(url)
+            loop_server += 1
+            logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
+            return downloadUrl(url, loop_server=loop_server)
         if 504 == e.code:
             htmlPage = e.read()
             logger.warning("504 from proxy received for {url}. Waiting 1 minute".format(url=url))
             time.sleep(60)
-            return downloadUrl(url)
+            loop_server += 1
+            logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
+            return downloadUrl(url, loop_server=loop_server)
         if 502 == e.code:
             htmlPage = e.read()
             logger.warning("502 from proxy received for {url}. Waiting 1 minute".format(url=url))
             time.sleep(60)
-            return downloadUrl(url)
+            loop_server += 1
+            logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
+            return downloadUrl(url, loop_server=loop_server)
         if 403 == e.code:
             htmlPage = e.read()
             if 'Please slow down' in htmlPage or 'has temporarily blocked your computer' in htmlPage or 'blocked' in htmlPage:
@@ -640,23 +651,31 @@ def downloadUrl(url, data=None, cookie=None, loop=0):
         if random_proxy:  # remove proxy from the list if needed
             failedProxy(random_proxy)
             logger.warning("Failed to download the page because of proxy error {0} trying again.".format(url))
-            return downloadUrl(url)
+            loop_server += 1
+            logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
+            return downloadUrl(url, loop_server=loop_server)
         if 'timed out' in e.reason:
             logger.warning("Timed out or slow down for {url}. Waiting 1 minute".format(url=url))
+            loop_server += 1
+            logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
             time.sleep(60)
-            return downloadUrl(url)
+            return downloadUrl(url, loop_server=loop_server)
         return None, None
     except socket.timeout:
         logger.debug("ERROR: timeout ############################# " + url)
         if random_proxy:  # remove proxy from the list if needed
             failedProxy(random_proxy)
-            logger.warning("Failed to download the page because of proxy error {0} trying again.".format(url))
-            return downloadUrl(url)
+            logger.warning("Failed to download the page because of socket error {0} trying again.".format(url))
+            loop_server += 1
+            logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
+            return downloadUrl(url, loop_server=loop_server)
         return None, None
     except Exception, e:
         failedProxy(random_proxy)
         logger.warning("Failed to download the page because of other HTTPlib error proxy error {0} trying again.".format(url))
-        return downloadUrl(url)
+        loop_server += 1
+        logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
+        return downloadUrl(url, loop_server=loop_server)
         #logger.error("ERROR: Other HTTPlib error: {e}".format(e=e))
         #return None, None
     # do NOT try to download the url again here, as we might end in enless loop
