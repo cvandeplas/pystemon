@@ -323,7 +323,6 @@ I found a hit for a regular expression on one of the pastebin sites.
 The site where the paste came from :        {site}
 The original paste was located here:        {url}
 And the regular expressions that matched:   {matches}
-The paste has also been attached to this email.
 
 Below (after newline) is the content of the pastie:
 
@@ -331,12 +330,6 @@ Below (after newline) is the content of the pastie:
 
         '''.format(site=self.site.name, url=self.url, matches=self.matchesToRegex(), content=self.pastie_content)
         msg.attach(MIMEText(message))
-        # original paste as attachment
-        #part = MIMEBase('application', "octet-stream")
-        #part.set_payload(self.pastie_content, charset='utf-8')
-        #Encoders.encode_base64(part)
-        #part.add_header('Content-Disposition', 'attachment; filename="%s.txt"' % (self.id))
-        #msg.attach(part)
         # send out the mail
         try:
             s = smtplib.SMTP(yamlconfig['email']['server'], yamlconfig['email']['port'])
@@ -644,7 +637,6 @@ def downloadUrl(url, data=None, cookie=None, loop=0):
         return None, None
     except urllib2.URLError, e:
         logger.debug("ERROR: URL Error ##### {e} ######################## ".format(e=e, url=url))
-        print e
         if random_proxy:  # remove proxy from the list if needed
             failedProxy(random_proxy)
             logger.warning("Failed to download the page because of proxy error {0} trying again.".format(url))
