@@ -578,10 +578,10 @@ class NoRedirectHandler(urllib2.HTTPRedirectHandler):
 
 def downloadUrl(url, data=None, cookie=None, loop_client=0, loop_server=0):
     # Client errors (40x): if more than 5 recursions, give up on URL (used for the 404 case)
-    if loop_client > retries_client:
+    if loop_client >= retries_client:
         return None, None
     # Server errors (50x): if more than 100 recursions, give up on URL
-    if loop_server > retries_server:
+    if loop_server >= retries_server:
         return None, None
     try:
         opener = None
