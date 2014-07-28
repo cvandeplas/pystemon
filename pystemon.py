@@ -33,6 +33,7 @@ import json
 import gzip
 import hashlib
 import traceback
+import redis
 from email.MIMEMultipart import MIMEMultipart
 from email.MIMEBase import MIMEBase
 from email.MIMEText import MIMEText
@@ -221,12 +222,18 @@ class Pastie():
         if not self.pastie_content:
             raise SystemExit('BUG: Content not set, sannot save')
         full_path = verifyDirectoryExists(directory) + os.sep + self.site.pastieIdToFilename(self.id)
+        if yamlconfig['redis']['queue']:
+            r = redis.StrictRedis(host=yamlconfig['redis']['server'],port=yamlconfig['redis']['port'],db=yamlconfig['redis']['database'])
         if self.site.archive_compress:
             with gzip.open(full_path, 'w') as f:
                 f.write(self.pastie_content.encode('utf8'))
+                if yamlconfig['redis']['queue']:
+                    r.lpush('pastes', full_path)
         else:
             with open(full_path, 'w') as f:
                 f.write(self.pastie_content.encode('utf8'))
+                if yamlconfig['redis']['queue']:
+                    r.lpush('pastes', full_path)
 
     def fetchAndProcessPastie(self):
         # double check if the pastie was already downloaded, and remember that we've seen it
@@ -578,10 +585,10 @@ class NoRedirectHandler(urllib2.HTTPRedirectHandler):
 
 def downloadUrl(url, data=None, cookie=None, loop_client=0, loop_server=0):
     # Client errors (40x): if more than 5 recursions, give up on URL (used for the 404 case)
-    if loop_client > retries_client:
+    if loop_client >= retries_client:
         return None, None
     # Server errors (50x): if more than 100 recursions, give up on URL
-    if loop_server > retries_server:
+    if loop_server >= retries_server:
         return None, None
     try:
         opener = None
