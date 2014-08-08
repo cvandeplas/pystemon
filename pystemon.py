@@ -586,8 +586,12 @@ def failed_proxy(proxy):
     if proxies_failed.count(proxy) >= 2 and proxies_list.count(proxy) >= 1:
         logger.info("Removing proxy {0} from proxy list because of to many errors errors.".format(proxy))
         proxies_lock.acquire()
-        proxies_list.remove(proxy)
+        try:
+            proxies_list.remove(proxy)
+        except ValueError:
+            pass
         proxies_lock.release()
+        logger.info("Proxies left: {0}".format(len(proxies_list)))
 
 
 class NoRedirectHandler(urllib2.HTTPRedirectHandler):
