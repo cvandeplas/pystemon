@@ -337,7 +337,7 @@ Below (after newline) is the content of the pastie:
 
 {content}
 
-        '''.format(site=self.site.name, url=self.url, matches=self.matchesToRegex(), content=self.pastie_content)
+        '''.format(site=self.site.name, url=self.url, matches=self.matchesToRegex(), content=self.pastie_content.encode('utf8'))
         msg.attach(MIMEText(message))
         # send out the mail
         try:
