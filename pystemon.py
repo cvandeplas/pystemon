@@ -34,6 +34,7 @@ import gzip
 import hashlib
 import traceback
 import redis
+from sets import Set
 from email.MIMEMultipart import MIMEMultipart
 from email.MIMEBase import MIMEBase
 from email.MIMEText import MIMEText
@@ -458,6 +459,13 @@ def main():
     global db
     queues = {}
     threads = []
+    
+    # start thread for proxy file listener
+    if yamlconfig['proxy']['random']:
+        t = ThreadProxyList(yamlconfig['proxy']['file'])
+        threads.append(t)
+        t.setDaemon(True)
+        t.start()
 
     # start a thread to handle the DB data
     db = None
@@ -496,7 +504,7 @@ def main():
         threads.append(t)
         t.setDaemon(True)
         t.start()
-
+    
     # wait while all the threads are running and someone sends CTRL+C
     while True:
         try:
@@ -535,7 +543,31 @@ def getRandomUserAgent():
 
 proxies_failed = []
 proxies_lock = threading.Lock()
-proxies_list = []
+proxies_list = Set([])
+
+
+class ThreadProxyList(threading.Thread):
+    '''
+    Threaded file listener for proxy list file. Modification to the file results
+    in updating the proxy list.
+    '''
+    global proxies_list
+
+    def __init__(self, filename):
+        threading.Thread.__init__(self)
+        self.filename = filename
+        self.last_mtime = 0
+        self.kill_received = False
+
+    def run(self):
+        while not self.kill_received:
+           mtime = os.stat(self.filename).st_mtime
+           if mtime != self.last_mtime:
+                logger.debug('Proxy configuration file changed. Reloading proxy list.')
+                proxies_lock.acquire()
+                loadProxiesFromFile(self.filename)
+                self.last_mtime = mtime
+                proxies_lock.release()
 
 
 def loadProxiesFromFile(filename):
@@ -547,7 +579,7 @@ def loadProxiesFromFile(filename):
     for line in f:
         line = line.strip()
         if line:  # LATER verify if the proxy line has the correct structure
-            proxies_list.append(line)
+            proxies_list.add(line)
     logger.debug('Found {count} proxies in file "{file}"'.format(file=filename, count=len(proxies_list)))
 
 
@@ -556,14 +588,14 @@ def getRandomProxy():
     proxy = None
     proxies_lock.acquire()
     if proxies_list:
-        proxy = random.choice(proxies_list)
+        proxy = random.choice(tuple(proxies_list))
     proxies_lock.release()
     return proxy
 
 
 def failedProxy(proxy):
     proxies_failed.append(proxy)
-    if proxies_failed.count(proxy) >= 2 and proxies_list.count(proxy) >= 1:
+    if proxies_failed.count(proxy) >= 2 and proxy in proxies_list:
         logger.info("Removing proxy {0} from proxy list because of to many errors errors.".format(proxy))
         proxies_lock.acquire()
         try:
@@ -799,7 +831,9 @@ def parseConfigFile(configfile):
     if yamlconfig['proxy']['random']:
         loadProxiesFromFile(yamlconfig['proxy']['file'])
     if yamlconfig['user-agent']['random']:
-        loadUserAgentsFromFile(yamlconfig['user-agent']['file'])
+        # TODO validity check only, proxy file will be loaded from file listener
+        pass
+        # loadUserAgentsFromFile(yamlconfig['user-agent']['file'])
 
 
 if __name__ == "__main__":
