@@ -427,7 +427,7 @@ class PastieSniptNet(Pastie):
             htmlDom = BeautifulSoup(downloaded_page)
             # search for <textarea class="raw">
             textarea = htmlDom.first('textarea', {'class': 'raw'})
-            if textarea:
+            if textarea and textarea.contents:
                 # replace html entities like &gt;
                 decoded = BeautifulSoup(
                     textarea.contents[0],
