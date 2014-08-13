@@ -535,7 +535,7 @@ def loadUserAgentsFromFile(filename):
 
 
 def getRandomUserAgent():
-    global proxies_list
+    global user_agents_list
     if user_agents_list:
         return random.choice(user_agents_list)
     return None
@@ -829,11 +829,11 @@ def parseConfigFile(configfile):
             exit(1)
     # TODO verify validity of config parameters
     if yamlconfig['proxy']['random']:
-        loadProxiesFromFile(yamlconfig['proxy']['file'])
-    if yamlconfig['user-agent']['random']:
         # TODO validity check only, proxy file will be loaded from file listener
         pass
-        # loadUserAgentsFromFile(yamlconfig['user-agent']['file'])
+        # loadProxiesFromFile(yamlconfig['proxy']['file'])
+    if yamlconfig['user-agent']['random']:
+        loadUserAgentsFromFile(yamlconfig['user-agent']['file'])
 
 
 if __name__ == "__main__":
