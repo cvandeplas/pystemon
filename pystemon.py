@@ -14,34 +14,34 @@ To be implemented:
 - TODO save files in separate directories depending on the day/week/month. Try to avoid duplicate files
 '''
 
-import optparse
-import logging.handlers
-import sys
-import threading
-import Queue
-from collections import deque
-import time
-from datetime import datetime
-import urllib2
-import urllib
-import socket
-import re
-import os
-import smtplib
-import random
-import json
-import gzip
-import hashlib
-import traceback
-import redis
-from email.MIMEMultipart import MIMEMultipart
-from email.MIMEBase import MIMEBase
-from email.MIMEText import MIMEText
-from email import Encoders
 try:
     from BeautifulSoup import BeautifulSoup
 except:
     exit('ERROR: Cannot import the BeautifulSoup 3 Python library. Are you sure you installed it? (apt-get install python-beautifulsoup')
+import Queue
+from collections import deque
+from datetime import datetime
+from email.MIMEMultipart import MIMEMultipart
+from email.MIMEBase import MIMEBase
+from email.MIMEText import MIMEText
+from email import Encoders
+import gzip
+import hashlib
+import json
+import logging.handlers
+import optparse
+import os
+import random
+import re
+import redis
+import smtplib
+import socket
+import sys
+import traceback
+import threading
+import time
+import urllib
+import urllib2
 try:
     import yaml
 except:
@@ -70,8 +70,8 @@ def make_bound_socket(source_ip):
 
 class PastieSite(threading.Thread):
     '''
-    Instances of these threads are responsible to download the list of the last pastes
-    and adding them to the list of pending tasks for individual pastes
+    Instances of these threads are responsible for downloading the list of
+    the most recent pastes and added those to the download queue.
     '''
     def __init__(self, name, download_url, archive_url, archive_regex):
         threading.Thread.__init__(self)
@@ -102,12 +102,15 @@ class PastieSite(threading.Thread):
 
     def run(self):
         while not self.kill_received:
+            sleep_time = random.randint(self.update_min, self.update_max)
             try:
-                sleep_time = random.randint(self.update_min, self.update_max)
                 # grabs site from queue
-                logger.info("Checking for new pasties from {name}. Next download scheduled in {time} seconds".format(name=self.name, time=sleep_time))
-                # get the list of last pasties, but reverse it so we first have the old
-                # entries and then the new ones
+                logger.info(
+                    'Downloading list of new pastes from {name}. '
+                    'Will check again in {time} seconds'.format(
+                        name=self.name, time=sleep_time))
+                # get the list of last pasties, but reverse it
+                # so we first have the old entries and then the new ones
                 last_pasties = self.get_last_pasties()
                 if last_pasties:
                     for pastie in reversed(last_pasties):
@@ -116,9 +119,11 @@ class PastieSite(threading.Thread):
                                                                                                           site=self.name,
                                                                                                           qsize=queues[self.name].qsize()))
             # catch unknown errors
-            except Exception, e:
-                logger.error("Thread for {name} crashed unexpectectly, recovering...: {e}".format(name=self.name, e=e))
-                logger.error(traceback.format_exc())
+            except Exception as e:
+                msg = 'Thread for {name} crashed unexpectectly, '\
+                      'recovering...: {e}'.format(name=self.name, e=e)
+                logger.error(msg)
+                logger.debug(traceback.format_exc())
             time.sleep(sleep_time)
 
     def get_last_pasties(self):
@@ -132,7 +137,8 @@ class PastieSite(threading.Thread):
         pasties_ids = re.findall(self.archive_regex, htmlPage)
         if pasties_ids:
             for pastie_id in pasties_ids:
-                # check if the pastie was already downloaded, and remember that we've seen it
+                # check if the pastie was already downloaded
+                # and remember that we've seen it
                 if self.seen_pastie(pastie_id):
                     # do not append the seen things again in the queue
                     continue
@@ -160,14 +166,18 @@ class PastieSite(threading.Thread):
         # TODO look in the database if it was already seen
 
     def seen_pastie_and_remember(self, pastie):
-        ''' check if the pastie was already downloaded, and remember that we've seen it '''
+        '''
+        Check if the pastie was already downloaded
+        and remember that we've seen it
+        '''
         seen = False
         if self.seen_pastie(pastie.id):
             seen = True
         else:
-            # we have not yet seen the pastie
-            # keep in memory that we've seen it
-            # appendleft for performance reasons (faster later when we iterate over the deque)
+            # We have not yet seen the pastie.
+            # Keep in memory that we've seen it using
+            # appendleft for performance reasons.
+            # (faster later when we iterate over the deque)
             self.seen_pasties.appendleft(pastie.id)
         # add / update the pastie in the database
         if db:
@@ -236,7 +246,8 @@ class Pastie():
                     r.lpush('pastes', full_path)
 
     def fetch_and_process_pastie(self):
-        # double check if the pastie was already downloaded, and remember that we've seen it
+        # double check if the pastie was already downloaded,
+        # and remember that we've seen it
         if self.site.seen_pastie(self.id):
             return None
         # download pastie
@@ -279,8 +290,9 @@ class Pastie():
             self.action_on_match()
 
     def action_on_match(self):
-        alert = "Found hit for {matches} in pastie {url}".format(matches=self.matches_to_text(), url=self.url)
-        logger.info(alert)
+        msg = 'Found hit for {matches} in pastie {url}'.format(
+            matches=self.matches_to_text(), url=self.url)
+        logger.info(msg)
         # store info in DB
         if db:
             db.queue.put(self)
@@ -357,7 +369,8 @@ Below (after newline) is the content of the pastie:
 class PastiePasteSiteCom(Pastie):
     '''
     Custom Pastie class for the pastesite.com site
-    This class overloads the fetch_pastie function to do the form submit to get the raw pastie
+    This class overloads the fetch_pastie function to do the form
+    submit to get the raw pastie
     '''
     def __init__(self, site, pastie_id):
         Pastie.__init__(self, site, pastie_id)
@@ -383,7 +396,8 @@ class PastiePasteSiteCom(Pastie):
 class PastieCdvLt(Pastie):
     '''
     Custom Pastie class for the cdv.lt site
-    This class overloads the fetch_pastie function to do the form submit to get the raw pastie
+    This class overloads the fetch_pastie function to do the form submit
+    to get the raw pastie
     '''
     def __init__(self, site, pastie_id):
         Pastie.__init__(self, site, pastie_id)
@@ -402,7 +416,8 @@ class PastieCdvLt(Pastie):
 class PastieSniptNet(Pastie):
     '''
     Custom Pastie class for the snipt.net site
-    This class overloads the fetch_pastie function to do the form submit to get the raw pastie
+    This class overloads the fetch_pastie function to do the form submit
+    to get the raw pastie
     '''
     def __init__(self, site, pastie_id):
         Pastie.__init__(self, site, pastie_id)
@@ -415,15 +430,17 @@ class PastieSniptNet(Pastie):
             textarea = htmlDom.first('textarea', {'class': 'raw'})
             if textarea:
                 # replace html entities like &gt;
-                decoded = BeautifulSoup(textarea.contents[0], convertEntities=BeautifulSoup.HTML_ENTITIES)
+                decoded = BeautifulSoup(
+                    textarea.contents[0],
+                    convertEntities=BeautifulSoup.HTML_ENTITIES)
                 self.pastie_content = decoded.contents[0]
         return self.pastie_content
 
 
 class ThreadPasties(threading.Thread):
     '''
-    Instances of these threads are responsible to download all the individual pastes
-    by checking their queue if there are pending tasks
+    Instances of these threads are responsible for downloading the pastes
+    found in the queue.
     '''
     def __init__(self, queue, queue_name):
         threading.Thread.__init__(self)
@@ -437,19 +454,23 @@ class ThreadPasties(threading.Thread):
                 # grabs pastie from queue
                 pastie = self.queue.get()
                 pastie_content = pastie.fetch_and_process_pastie()
-                logger.debug("Queue {name} size: {size}".format(size=self.queue.qsize(), name=self.name))
+                logger.debug("Queue {name} size: {size}".format(
+                    size=self.queue.qsize(), name=self.name))
                 if pastie_content:
-                    logger.debug("Saved new pastie from {0} with id {1}".format(self.name, pastie.id))
+                    logger.debug(
+                        "Saved new pastie from {0} "
+                        "with id {1}".format(self.name, pastie.id))
                 else:
                     # pastie already downloaded OR error ?
                     pass
                 # signals to queue job is done
                 self.queue.task_done()
             # catch unknown errors
-            except Exception, e:
-                logger.error("ThreadPasties for {name} crashed unexpectectly, recovering...: {e}".format(name=self.name, e=e))
-                logger.error("    pastie from {0} with id {1}".format(self.name, pastie.id))
-                logger.error(traceback.format_exc())
+            except Exception as e:
+                msg = "ThreadPasties for {name} crashed unexpectectly, "\
+                      "recovering...: {e}".format(name=self.name, e=e)
+                logger.error(msg)
+                logger.debug(traceback.format_exc())
 
 
 def main():
@@ -607,7 +628,9 @@ def download_url(url, data=None, cookie=None, loop_client=0, loop_server=0):
             opener.addheaders.append(('User-Agent', user_agent))
         if cookie:
             opener.addheaders.append(('Cookie', cookie))
-        logger.debug("Downloading url: {url} with proxy: {proxy} and user-agent: {ua}".format(url=url, proxy=random_proxy, ua=user_agent))
+        logger.debug(
+            'Downloading url: {url} with proxy: {proxy} and user-agent: {ua}'.format(
+                url=url, proxy=random_proxy, ua=user_agent))
         if data:
             response = opener.open(url, data)
         else:
@@ -677,7 +700,7 @@ def download_url(url, data=None, cookie=None, loop_client=0, loop_server=0):
             logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
             return download_url(url, loop_server=loop_server)
         return None, None
-    except Exception, e:
+    except Exception as e:
         failed_proxy(random_proxy)
         logger.warning("Failed to download the page because of other HTTPlib error proxy error {0} trying again.".format(url))
         loop_server += 1
