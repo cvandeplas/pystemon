@@ -108,7 +108,7 @@ class PastieSite(threading.Thread):
                 logger.info("Checking for new pasties from {name}. Next download scheduled in {time} seconds".format(name=self.name, time=sleep_time))
                 # get the list of last pasties, but reverse it so we first have the old
                 # entries and then the new ones
-                last_pasties = self.getLastPasties()
+                last_pasties = self.get_last_pasties()
                 if last_pasties:
                     for pastie in reversed(last_pasties):
                         queues[self.name].put(pastie)  # add pastie to queue
@@ -121,11 +121,11 @@ class PastieSite(threading.Thread):
                 logger.error(traceback.format_exc())
             time.sleep(sleep_time)
 
-    def getLastPasties(self):
+    def get_last_pasties(self):
         # reset the pasties list
         pasties = []
         # populate queue with data
-        htmlPage, headers = downloadUrl(self.archive_url)
+        htmlPage, headers = download_url(self.archive_url)
         if not htmlPage:
             logger.warning("No HTML content for page {url}".format(url=self.archive_url))
             return False
@@ -133,7 +133,7 @@ class PastieSite(threading.Thread):
         if pasties_ids:
             for pastie_id in pasties_ids:
                 # check if the pastie was already downloaded, and remember that we've seen it
-                if self.seenPastie(pastie_id):
+                if self.seen_pastie(pastie_id):
                     # do not append the seen things again in the queue
                     continue
                 # pastie was not downloaded yet. Add it to the queue
@@ -147,7 +147,7 @@ class PastieSite(threading.Thread):
         logger.error("No last pasties matches for regular expression site:{site} regex:{regex}. Error in your regex? Dumping htmlPage \n {html}".format(site=self.name, regex=self.archive_regex, html=htmlPage.encode('utf8')))
         return False
 
-    def seenPastie(self, pastie_id):
+    def seen_pastie(self, pastie_id):
         ''' check if the pastie was already downloaded. '''
         # first look in memory if we have already seen this pastie
         if self.seen_pasties.count(pastie_id):
@@ -155,14 +155,14 @@ class PastieSite(threading.Thread):
         # look on the filesystem.  # LATER remove this filesystem lookup as it will give problems on long term
         if yamlconfig['archive']['save-all']:
             # check if the pastie was already saved on the disk
-            if os.path.exists(verifyDirectoryExists(self.archive_dir) + os.sep + self.pastieIdToFilename(pastie_id)):
+            if os.path.exists(verify_directory_exists(self.archive_dir) + os.sep + self.pastie_id_to_filename(pastie_id)):
                 return True
         # TODO look in the database if it was already seen
 
-    def seenPastieAndRemember(self, pastie):
+    def seen_pastie_and_remember(self, pastie):
         ''' check if the pastie was already downloaded, and remember that we've seen it '''
         seen = False
-        if self.seenPastie(pastie.id):
+        if self.seen_pastie(pastie.id):
             seen = True
         else:
             # we have not yet seen the pastie
@@ -174,14 +174,14 @@ class PastieSite(threading.Thread):
             db.queue.put(pastie)
         return seen
 
-    def pastieIdToFilename(self, pastie_id):
+    def pastie_id_to_filename(self, pastie_id):
         filename = pastie_id.replace('/', '_')
         if self.archive_compress:
             filename = filename + ".gz"
         return filename
 
 
-def verifyDirectoryExists(directory):
+def verify_directory_exists(directory):
     d = datetime.now()
     year = str(d.year)
     month = str(d.month)
@@ -206,7 +206,7 @@ class Pastie():
         self.md5 = None
         self.url = self.site.download_url.format(id=self.id)
 
-    def hashPastie(self):
+    def hash_pastie(self):
         if self.pastie_content:
             try:
                 self.md5 = hashlib.md5(self.pastie_content.encode('utf-8')).hexdigest()
@@ -214,14 +214,14 @@ class Pastie():
             except Exception, e:
                 logger.error('Pastie {site} {id} md5 problem: {e}'.format(site=self.site.name, id=self.id, e=e))
 
-    def fetchPastie(self):
-        self.pastie_content, headers = downloadUrl(self.url)
+    def fetch_pastie(self):
+        self.pastie_content, headers = download_url(self.url)
         return self.pastie_content
 
-    def savePastie(self, directory):
+    def save_pastie(self, directory):
         if not self.pastie_content:
             raise SystemExit('BUG: Content not set, sannot save')
-        full_path = verifyDirectoryExists(directory) + os.sep + self.site.pastieIdToFilename(self.id)
+        full_path = verify_directory_exists(directory) + os.sep + self.site.pastie_id_to_filename(self.id)
         if yamlconfig['redis']['queue']:
             r = redis.StrictRedis(host=yamlconfig['redis']['server'],port=yamlconfig['redis']['port'],db=yamlconfig['redis']['database'])
         if self.site.archive_compress:
@@ -235,26 +235,26 @@ class Pastie():
                 if yamlconfig['redis']['queue']:
                     r.lpush('pastes', full_path)
 
-    def fetchAndProcessPastie(self):
+    def fetch_and_process_pastie(self):
         # double check if the pastie was already downloaded, and remember that we've seen it
-        if self.site.seenPastie(self.id):
+        if self.site.seen_pastie(self.id):
             return None
         # download pastie
-        self.fetchPastie()
+        self.fetch_pastie()
         # save the pastie on the disk
         if self.pastie_content:
             # take checksum
-            self.hashPastie()
+            self.hash_pastie()
             # keep in memory that the pastie was seen successfully
-            self.site.seenPastieAndRemember(self)
+            self.site.seen_pastie_and_remember(self)
             # Save pastie to archive dir if configured
             if yamlconfig['archive']['save-all']:
-                self.savePastie(self.site.archive_dir)
+                self.save_pastie(self.site.archive_dir)
             # search for data in pastie
-            self.searchContent()
+            self.search_content()
         return self.pastie_content
 
-    def searchContent(self):
+    def search_content(self):
         if not self.pastie_content:
             raise SystemExit('BUG: Content not set, cannot search')
             return False
@@ -276,22 +276,22 @@ class Pastie():
                 # we have a match, add to match list
                 self.matches.append(regex)
         if self.matches:
-            self.actionOnMatch()
+            self.action_on_match()
 
-    def actionOnMatch(self):
-        alert = "Found hit for {matches} in pastie {url}".format(matches=self.matchesToText(), url=self.url)
+    def action_on_match(self):
+        alert = "Found hit for {matches} in pastie {url}".format(matches=self.matches_to_text(), url=self.url)
         logger.info(alert)
         # store info in DB
         if db:
             db.queue.put(self)
         # Save pastie to disk if configured
         if yamlconfig['archive']['save']:
-            self.savePastie(self.site.save_dir)
+            self.save_pastie(self.site.save_dir)
         # Send email alert if configured
         if yamlconfig['email']['alert']:
-            self.sendEmailAlert()
+            self.send_email_alert()
 
-    def matchesToText(self):
+    def matches_to_text(self):
         descriptions = []
         for match in self.matches:
             if 'description' in match:
@@ -303,7 +303,7 @@ class Pastie():
         else:
             return ''
 
-    def matchesToRegex(self):
+    def matches_to_regex(self):
         descriptions = []
         for match in self.matches:
             descriptions.append(match['search'])
@@ -312,9 +312,9 @@ class Pastie():
         else:
             return ''
 
-    def sendEmailAlert(self):
+    def send_email_alert(self):
         msg = MIMEMultipart()
-        alert = "Found hit for {matches} in pastie {url}".format(matches=self.matchesToText(), url=self.url)
+        alert = "Found hit for {matches} in pastie {url}".format(matches=self.matches_to_text(), url=self.url)
         # headers
         msg['Subject'] = yamlconfig['email']['subject'].format(subject=alert)
         msg['From'] = yamlconfig['email']['from']
@@ -337,7 +337,7 @@ Below (after newline) is the content of the pastie:
 
 {content}
 
-        '''.format(site=self.site.name, url=self.url, matches=self.matchesToRegex(), content=self.pastie_content)
+        '''.format(site=self.site.name, url=self.url, matches=self.matches_to_regex(), content=self.pastie_content)
         msg.attach(MIMEText(message))
         # send out the mail
         try:
@@ -357,13 +357,13 @@ Below (after newline) is the content of the pastie:
 class PastiePasteSiteCom(Pastie):
     '''
     Custom Pastie class for the pastesite.com site
-    This class overloads the fetchPastie function to do the form submit to get the raw pastie
+    This class overloads the fetch_pastie function to do the form submit to get the raw pastie
     '''
     def __init__(self, site, pastie_id):
         Pastie.__init__(self, site, pastie_id)
 
-    def fetchPastie(self):
-        validation_form_page, headers = downloadUrl(self.url)
+    def fetch_pastie(self):
+        validation_form_page, headers = download_url(self.url)
         if validation_form_page:
             htmlDom = BeautifulSoup(validation_form_page)
             if not htmlDom:
@@ -376,20 +376,20 @@ class PastiePasteSiteCom(Pastie):
             data = urllib.urlencode({'plainConfirm': plain_confirm})
             url = "http://pastesite.com/plain/{id}".format(id=self.id)
             cookie = headers.dict['set-cookie']
-            self.pastie_content, headers = downloadUrl(url, data, cookie)
+            self.pastie_content, headers = download_url(url, data, cookie)
         return self.pastie_content
 
 
 class PastieCdvLt(Pastie):
     '''
     Custom Pastie class for the cdv.lt site
-    This class overloads the fetchPastie function to do the form submit to get the raw pastie
+    This class overloads the fetch_pastie function to do the form submit to get the raw pastie
     '''
     def __init__(self, site, pastie_id):
         Pastie.__init__(self, site, pastie_id)
 
-    def fetchPastie(self):
-        downloaded_page, headers = downloadUrl(self.url)
+    def fetch_pastie(self):
+        downloaded_page, headers = download_url(self.url)
         if downloaded_page:
             # convert to json object
             json_pastie = json.loads(downloaded_page)
@@ -402,13 +402,13 @@ class PastieCdvLt(Pastie):
 class PastieSniptNet(Pastie):
     '''
     Custom Pastie class for the snipt.net site
-    This class overloads the fetchPastie function to do the form submit to get the raw pastie
+    This class overloads the fetch_pastie function to do the form submit to get the raw pastie
     '''
     def __init__(self, site, pastie_id):
         Pastie.__init__(self, site, pastie_id)
 
-    def fetchPastie(self):
-        downloaded_page, headers = downloadUrl(self.url)
+    def fetch_pastie(self):
+        downloaded_page, headers = download_url(self.url)
         if downloaded_page:
             htmlDom = BeautifulSoup(downloaded_page)
             # search for <textarea class="raw">
@@ -436,7 +436,7 @@ class ThreadPasties(threading.Thread):
             try:
                 # grabs pastie from queue
                 pastie = self.queue.get()
-                pastie_content = pastie.fetchAndProcessPastie()
+                pastie_content = pastie.fetch_and_process_pastie()
                 logger.debug("Queue {name} size: {size}".format(size=self.queue.qsize(), name=self.name))
                 if pastie_content:
                     logger.debug("Saved new pastie from {0} with id {1}".format(self.name, pastie.id))
@@ -513,7 +513,7 @@ def main():
 user_agents_list = []
 
 
-def loadUserAgentsFromFile(filename):
+def load_user_agents_from_file(filename):
     global user_agents_list
     try:
         f = open(filename)
@@ -526,7 +526,7 @@ def loadUserAgentsFromFile(filename):
     logger.debug('Found {count} UserAgents in file "{file}"'.format(file=filename, count=len(user_agents_list)))
 
 
-def getRandomUserAgent():
+def get_random_user_agent():
     global proxies_list
     if user_agents_list:
         return random.choice(user_agents_list)
@@ -538,7 +538,7 @@ proxies_lock = threading.Lock()
 proxies_list = []
 
 
-def loadProxiesFromFile(filename):
+def load_proxies_from_file(filename):
     global proxies_list
     try:
         f = open(filename)
@@ -551,7 +551,7 @@ def loadProxiesFromFile(filename):
     logger.debug('Found {count} proxies in file "{file}"'.format(file=filename, count=len(proxies_list)))
 
 
-def getRandomProxy():
+def get_random_proxy():
     global proxies_list
     proxy = None
     proxies_lock.acquire()
@@ -561,7 +561,7 @@ def getRandomProxy():
     return proxy
 
 
-def failedProxy(proxy):
+def failed_proxy(proxy):
     proxies_failed.append(proxy)
     if proxies_failed.count(proxy) >= 2 and proxies_list.count(proxy) >= 1:
         logger.info("Removing proxy {0} from proxy list because of to many errors errors.".format(proxy))
@@ -573,7 +573,7 @@ def failedProxy(proxy):
 class NoRedirectHandler(urllib2.HTTPRedirectHandler):
     '''
     This class is only necessary to not follow HTTP redirects in webpages.
-    It is used by the downloadUrl() function
+    It is used by the download_url() function
     '''
     def http_error_302(self, req, fp, code, msg, headers):
         infourl = urllib2.addinfourl(fp, headers, req.get_full_url())
@@ -583,7 +583,7 @@ class NoRedirectHandler(urllib2.HTTPRedirectHandler):
     http_error_301 = http_error_303 = http_error_307 = http_error_302
 
 
-def downloadUrl(url, data=None, cookie=None, loop_client=0, loop_server=0):
+def download_url(url, data=None, cookie=None, loop_client=0, loop_server=0):
     # Client errors (40x): if more than 5 recursions, give up on URL (used for the 404 case)
     if loop_client >= retries_client:
         return None, None
@@ -593,7 +593,7 @@ def downloadUrl(url, data=None, cookie=None, loop_client=0, loop_server=0):
     try:
         opener = None
         # Random Proxy if set in config
-        random_proxy = getRandomProxy()
+        random_proxy = get_random_proxy()
         if random_proxy:
             proxyh = urllib2.ProxyHandler({'http': random_proxy})
             opener = urllib2.build_opener(proxyh, NoRedirectHandler())
@@ -601,7 +601,7 @@ def downloadUrl(url, data=None, cookie=None, loop_client=0, loop_server=0):
         if not opener:
             opener = urllib2.build_opener(NoRedirectHandler())
         # Random User-Agent if set in config
-        user_agent = getRandomUserAgent()
+        user_agent = get_random_user_agent()
         opener.addheaders = [('Accept-Charset', 'utf-8')]
         if user_agent:
             opener.addheaders.append(('User-Agent', user_agent))
@@ -615,7 +615,7 @@ def downloadUrl(url, data=None, cookie=None, loop_client=0, loop_server=0):
         htmlPage = unicode(response.read(), errors='replace')
         return htmlPage, response.headers
     except urllib2.HTTPError, e:
-        failedProxy(random_proxy)
+        failed_proxy(random_proxy)
         logger.warning("!!Proxy error on {0}.".format(url))
         if 404 == e.code:
             htmlPage = e.read()
@@ -623,66 +623,66 @@ def downloadUrl(url, data=None, cookie=None, loop_client=0, loop_server=0):
             time.sleep(60)
             loop_client += 1
             logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_client, total=retries_client, url=url))
-            return downloadUrl(url, loop_client=loop_client)
+            return download_url(url, loop_client=loop_client)
         if 500 == e.code:
             htmlPage = e.read()
             logger.warning("500 from proxy received for {url}. Waiting 1 minute".format(url=url))
             time.sleep(60)
             loop_server += 1
             logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
-            return downloadUrl(url, loop_server=loop_server)
+            return download_url(url, loop_server=loop_server)
         if 504 == e.code:
             htmlPage = e.read()
             logger.warning("504 from proxy received for {url}. Waiting 1 minute".format(url=url))
             time.sleep(60)
             loop_server += 1
             logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
-            return downloadUrl(url, loop_server=loop_server)
+            return download_url(url, loop_server=loop_server)
         if 502 == e.code:
             htmlPage = e.read()
             logger.warning("502 from proxy received for {url}. Waiting 1 minute".format(url=url))
             time.sleep(60)
             loop_server += 1
             logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
-            return downloadUrl(url, loop_server=loop_server)
+            return download_url(url, loop_server=loop_server)
         if 403 == e.code:
             htmlPage = e.read()
             if 'Please slow down' in htmlPage or 'has temporarily blocked your computer' in htmlPage or 'blocked' in htmlPage:
                 logger.warning("Slow down message received for {url}. Waiting 1 minute".format(url=url))
                 time.sleep(60)
-                return downloadUrl(url)
+                return download_url(url)
         logger.warning("ERROR: HTTP Error ##### {e} ######################## {url}".format(e=e, url=url))
         return None, None
     except urllib2.URLError, e:
         logger.debug("ERROR: URL Error ##### {e} ######################## ".format(e=e, url=url))
         if random_proxy:  # remove proxy from the list if needed
-            failedProxy(random_proxy)
+            failed_proxy(random_proxy)
             logger.warning("Failed to download the page because of proxy error {0} trying again.".format(url))
             loop_server += 1
             logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
-            return downloadUrl(url, loop_server=loop_server)
+            return download_url(url, loop_server=loop_server)
         if 'timed out' in e.reason:
             logger.warning("Timed out or slow down for {url}. Waiting 1 minute".format(url=url))
             loop_server += 1
             logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
             time.sleep(60)
-            return downloadUrl(url, loop_server=loop_server)
+            return download_url(url, loop_server=loop_server)
         return None, None
     except socket.timeout:
         logger.debug("ERROR: timeout ############################# " + url)
         if random_proxy:  # remove proxy from the list if needed
-            failedProxy(random_proxy)
+            failed_proxy(random_proxy)
             logger.warning("Failed to download the page because of socket error {0} trying again.".format(url))
             loop_server += 1
             logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
-            return downloadUrl(url, loop_server=loop_server)
+            return download_url(url, loop_server=loop_server)
         return None, None
     except Exception, e:
-        failedProxy(random_proxy)
+        failed_proxy(random_proxy)
         logger.warning("Failed to download the page because of other HTTPlib error proxy error {0} trying again.".format(url))
         loop_server += 1
         logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
-        return downloadUrl(url, loop_server=loop_server)
+        return download_url(url, loop_server=loop_server)
         #logger.error("ERROR: Other HTTPlib error: {e}".format(e=e))
         #return None, None
     # do NOT try to download the url again here, as we might end in enless loop
@@ -723,7 +723,7 @@ class Sqlite3Database(threading.Thread):
                 # grabs pastie from queue
                 pastie = self.queue.get()
                 # add the pastie to the DB
-                self.addOrUpdate(pastie)
+                self.add_or_update(pastie)
                 # signals to queue job is done
                 self.queue.task_done()
             # catch unknown errors
@@ -731,7 +731,7 @@ class Sqlite3Database(threading.Thread):
                 logger.error("Thread for SQLite crashed unexpectectly, recovering...: {e}".format(e=e))
                 logger.debug(traceback.format_exc())
 
-    def addOrUpdate(self, pastie):
+    def add_or_update(self, pastie):
         data = {'site': pastie.site.name,
                 'id': pastie.id
                 }
@@ -749,9 +749,9 @@ class Sqlite3Database(threading.Thread):
                     'id': pastie.id,
                     'md5': pastie.md5,
                     'url': pastie.url,
-                    'local_path': pastie.site.archive_dir + os.sep + pastie.site.pastieIdToFilename(pastie.id),
+                    'local_path': pastie.site.archive_dir + os.sep + pastie.site.pastie_id_to_filename(pastie.id),
                     'timestamp': datetime.now(),
-                    'matches': pastie.matchesToText()
+                    'matches': pastie.matches_to_text()
                     }
             self.c.execute('INSERT INTO pasties VALUES (:site, :id, :md5, :url, :local_path, :timestamp, :matches)', data)
             self.db_conn.commit()
@@ -765,9 +765,9 @@ class Sqlite3Database(threading.Thread):
                     'id': pastie.id,
                     'md5': pastie.md5,
                     'url': pastie.url,
-                    'local_path': pastie.site.archive_dir + os.sep + pastie.site.pastieIdToFilename(pastie.id),
+                    'local_path': pastie.site.archive_dir + os.sep + pastie.site.pastie_id_to_filename(pastie.id),
                     'timestamp': datetime.now(),
-                    'matches': pastie.matchesToText()
+                    'matches': pastie.matches_to_text()
                     }
             self.c.execute('''UPDATE pasties SET md5 = :md5,
                                             url = :url,
@@ -781,7 +781,7 @@ class Sqlite3Database(threading.Thread):
         logger.debug('Updated pastie {site} {id} in the SQLite database.'.format(site=pastie.site.name, id=pastie.id))
 
 
-def parseConfigFile(configfile):
+def parse_config_file(configfile):
     global yamlconfig
     try:
         yamlconfig = yaml.load(file(configfile))
@@ -793,9 +793,9 @@ def parseConfigFile(configfile):
             exit(1)
     # TODO verify validity of config parameters
     if yamlconfig['proxy']['random']:
-        loadProxiesFromFile(yamlconfig['proxy']['file'])
+        load_proxies_from_file(yamlconfig['proxy']['file'])
     if yamlconfig['user-agent']['random']:
-        loadUserAgentsFromFile(yamlconfig['user-agent']['file'])
+        load_user_agents_from_file(yamlconfig['user-agent']['file'])
 
 
 if __name__ == "__main__":
@@ -836,6 +836,6 @@ if __name__ == "__main__":
         logger.addHandler(logging.handlers.SysLogHandler(facility=logging.handlers.SysLogHandler.LOG_DAEMON))
         # FIXME run application in background
 
-    parseConfigFile(options.config)
+    parse_config_file(options.config)
     # run the software
     main()
