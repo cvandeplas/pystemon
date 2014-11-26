@@ -33,7 +33,6 @@ import optparse
 import os
 import random
 import re
-import redis
 import smtplib
 import socket
 import sys
@@ -233,6 +232,7 @@ class Pastie():
             raise SystemExit('BUG: Content not set, sannot save')
         full_path = verify_directory_exists(directory) + os.sep + self.site.pastie_id_to_filename(self.id)
         if yamlconfig['redis']['queue']:
+            import redis
             r = redis.StrictRedis(host=yamlconfig['redis']['server'],port=yamlconfig['redis']['port'],db=yamlconfig['redis']['database'])
         if self.site.archive_compress:
             with gzip.open(full_path, 'w') as f:
