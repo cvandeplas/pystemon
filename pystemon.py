@@ -232,7 +232,6 @@ class Pastie():
             raise SystemExit('BUG: Content not set, sannot save')
         full_path = verify_directory_exists(directory) + os.sep + self.site.pastie_id_to_filename(self.id)
         if yamlconfig['redis']['queue']:
-            import redis
             r = redis.StrictRedis(host=yamlconfig['redis']['server'],port=yamlconfig['redis']['port'],db=yamlconfig['redis']['database'])
         if self.site.archive_compress:
             with gzip.open(full_path, 'w') as f:
@@ -819,6 +818,8 @@ def parse_config_file(configfile):
         load_proxies_from_file(yamlconfig['proxy']['file'])
     if yamlconfig['user-agent']['random']:
         load_user_agents_from_file(yamlconfig['user-agent']['file'])
+    if yamlconfig['redis']['queue']:
+    	import redis
 
 
 if __name__ == "__main__":
