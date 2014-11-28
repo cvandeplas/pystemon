@@ -33,7 +33,6 @@ import optparse
 import os
 import random
 import re
-import redis
 import smtplib
 import socket
 import sys
@@ -819,6 +818,8 @@ def parse_config_file(configfile):
         load_proxies_from_file(yamlconfig['proxy']['file'])
     if yamlconfig['user-agent']['random']:
         load_user_agents_from_file(yamlconfig['user-agent']['file'])
+    if yamlconfig['redis']['queue']:
+    	import redis
 
 
 if __name__ == "__main__":
