@@ -14,7 +14,7 @@ db:
     file: 'db.sqlite3'  # The filename of the database
 
 redis:
-  queue: yes
+  queue: no
   server: "localhost"
   port: 6379
   database: 10
@@ -149,8 +149,10 @@ site:
 # Currently only HTTP proxies are permitted
 #
 proxy:
+  use: no
   random: no
-  file: 'proxies.txt'
+  single-proxy: 'http://127.0.0.1:8080' 
+  random-proxy-file: 'proxies.txt'
 
 #####
 # Configuration section for User-Agents

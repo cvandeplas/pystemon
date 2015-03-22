@@ -3,6 +3,7 @@
 
 '''
 @author:     Christophe Vandeplas <christophe@vandeplas.com>
+@modified by: Tiago Mendo <tiagomendo@gmail.com>
 @copyright:  AGPLv3 
              http://www.gnu.org/licenses/agpl.html
 
@@ -33,7 +34,6 @@ import json
 import gzip
 import hashlib
 import traceback
-import redis
 from sets import Set
 from email.MIMEMultipart import MIMEMultipart
 from email.MIMEBase import MIMEBase
@@ -74,7 +74,7 @@ class PastieSite(threading.Thread):
     Instances of these threads are responsible to download the list of the last pastes
     and adding them to the list of pending tasks for individual pastes
     '''
-    def __init__(self, name, download_url, archive_url, archive_regex):
+    def __init__(self, name, download_url, archive_url, archive_regex, update_min, update_max, pastie_classname):
         threading.Thread.__init__(self)
         self.kill_received = False
 
@@ -82,6 +82,9 @@ class PastieSite(threading.Thread):
         self.download_url = download_url
         self.archive_url = archive_url
         self.archive_regex = archive_regex
+        self.update_min = update_min
+        self.update_max = update_max
+        self.pastie_classname = pastie_classname
         try:
             self.ip_addr = yamlconfig['network']['ip']
             true_socket = socket.socket
@@ -96,9 +99,6 @@ class PastieSite(threading.Thread):
         if yamlconfig['archive']['save-all'] and not os.path.exists(self.archive_dir):
             os.makedirs(self.archive_dir)
         self.archive_compress = yamlconfig['archive']['compress']
-        self.update_max = 30  # TODO set by config file
-        self.update_min = 10  # TODO set by config file
-        self.pastie_classname = None
         self.seen_pasties = deque('', 1000)  # max number of pasties ids in memory
 
     def run(self):
@@ -462,7 +462,7 @@ def main():
     
     # start thread for proxy file listener
     if yamlconfig['proxy']['random']:
-        t = ThreadProxyList(yamlconfig['proxy']['file'])
+        t = ThreadProxyList(yamlconfig['proxy']['random-proxy-file'])
         threads.append(t)
         t.setDaemon(True)
         t.start()
@@ -491,16 +491,26 @@ def main():
 
     # build threads to download the last pasties
     for site_name in yamlconfig['site']:
+        if 'update-min' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['update-min']:
+            update_min = yamlconfig['site'][site_name]['update-min']
+        else:
+            update_min = 10
+        if 'update-max' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['update-max']:
+            update_max = yamlconfig['site'][site_name]['update-max']
+        else:
+            update_max = 30
+        if 'pastie-classname' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['pastie-classname']:
+            pastie_classname = yamlconfig['site'][site_name]['pastie-classname']
+        else:
+            pastie_classname = None
+    
         t = PastieSite(site_name,
                       yamlconfig['site'][site_name]['download-url'],
                       yamlconfig['site'][site_name]['archive-url'],
-                      yamlconfig['site'][site_name]['archive-regex'])
-        if 'update-min' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['update-min']:
-            t.update_min = yamlconfig['site'][site_name]['update-min']
-        if 'update-max' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['update-max']:
-            t.update_max = yamlconfig['site'][site_name]['update-max']
-        if 'pastie-classname' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['pastie-classname']:
-            t.pastie_classname = yamlconfig['site'][site_name]['pastie-classname']
+                      yamlconfig['site'][site_name]['archive-regex'],
+                      update_min,
+                      update_max,
+                      pastie_classname)
         threads.append(t)
         t.setDaemon(True)
         t.start()
@@ -628,11 +638,20 @@ def downloadUrl(url, data=None, cookie=None, loop_client=0, loop_server=0):
         return None, None
     try:
         opener = None
-        # Random Proxy if set in config
-        random_proxy = getRandomProxy()
-        if random_proxy:
-            proxyh = urllib2.ProxyHandler({'http': random_proxy})
+        if yamlconfig['proxy']['use']:
+            if yamlconfig['proxy']['random']:
+                # Random Proxy if set in 
+                proxy = getRandomProxy()
+                if proxy:
+                    proxyh = urllib2.ProxyHandler({'http': proxy})                
+            else: 
+                proxy = yamlconfig['proxy']['single-proxy']
+                proxyh = urllib2.ProxyHandler({'http': proxy})
+            
             opener = urllib2.build_opener(proxyh, NoRedirectHandler())
+        else:
+            proxy = None        
+    
         # We need to create an opener if it didn't exist yet
         if not opener:
             opener = urllib2.build_opener(NoRedirectHandler())
@@ -643,7 +662,7 @@ def downloadUrl(url, data=None, cookie=None, loop_client=0, loop_server=0):
             opener.addheaders.append(('User-Agent', user_agent))
         if cookie:
             opener.addheaders.append(('Cookie', cookie))
-        logger.debug("Downloading url: {url} with proxy: {proxy} and user-agent: {ua}".format(url=url, proxy=random_proxy, ua=user_agent))
+        logger.debug("Downloading url: {url} with proxy: {proxy} and user-agent: {ua}".format(url=url, proxy=proxy, ua=user_agent))
         if data:
             response = opener.open(url, data)
         else:
@@ -651,7 +670,8 @@ def downloadUrl(url, data=None, cookie=None, loop_client=0, loop_server=0):
         htmlPage = unicode(response.read(), errors='replace')
         return htmlPage, response.headers
     except urllib2.HTTPError, e:
-        failedProxy(random_proxy)
+        if yamlconfig['proxy']['use'] and yamlconfig['proxy']['random']:
+            failedProxy(proxy)
         logger.warning("!!Proxy error on {0}.".format(url))
         if 404 == e.code:
             htmlPage = e.read()
@@ -691,8 +711,9 @@ def downloadUrl(url, data=None, cookie=None, loop_client=0, loop_server=0):
         return None, None
     except urllib2.URLError, e:
         logger.debug("ERROR: URL Error ##### {e} ######################## ".format(e=e, url=url))
-        if random_proxy:  # remove proxy from the list if needed
-            failedProxy(random_proxy)
+        if proxy:  # remove proxy from the list if needed
+            if yamlconfig['proxy']['use'] and yamlconfig['proxy']['random']:
+                failedProxy(proxy)
             logger.warning("Failed to download the page because of proxy error {0} trying again.".format(url))
             loop_server += 1
             logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
@@ -706,15 +727,17 @@ def downloadUrl(url, data=None, cookie=None, loop_client=0, loop_server=0):
         return None, None
     except socket.timeout:
         logger.debug("ERROR: timeout ############################# " + url)
-        if random_proxy:  # remove proxy from the list if needed
-            failedProxy(random_proxy)
+        if proxy:  # remove proxy from the list if needed
+            if yamlconfig['proxy']['use'] and yamlconfig['proxy']['random']:
+                failedProxy(proxy)
             logger.warning("Failed to download the page because of socket error {0} trying again.".format(url))
             loop_server += 1
             logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
             return downloadUrl(url, loop_server=loop_server)
         return None, None
     except Exception, e:
-        failedProxy(random_proxy)
+        if yamlconfig['proxy']['use'] and yamlconfig['proxy']['random']:
+            failedProxy(proxy)
         logger.warning("Failed to download the page because of other HTTPlib error proxy error {0} trying again.".format(url))
         loop_server += 1
         logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
@@ -828,12 +851,16 @@ def parseConfigFile(configfile):
             logger.error("error position: (%s:%s)" % (mark.line + 1, mark.column + 1))
             exit(1)
     # TODO verify validity of config parameters
-    if yamlconfig['proxy']['random']:
-        # TODO validity check only, proxy file will be loaded from file listener
-        pass
-        # loadProxiesFromFile(yamlconfig['proxy']['file'])
+    if yamlconfig['proxy']['use']:
+        if yamlconfig['proxy']['random']:
+            # TODO validity check only, proxy file will be loaded from file listener
+            pass            
+        elif not yamlconfig['proxy']['single-proxy']:
+            logger.error("Proxy enabled but not set. Set single-proxy or use random with a file")
     if yamlconfig['user-agent']['random']:
         loadUserAgentsFromFile(yamlconfig['user-agent']['file'])
+    if yamlconfig['redis']['queue']:
+    	import redis
 
 
 if __name__ == "__main__":
