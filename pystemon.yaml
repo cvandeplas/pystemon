@@ -10,7 +10,7 @@ archive:
 
 db:
   sqlite3:              # Store information about the pastie in a database
-    enable: no          # Activate this DB engine   # NOT FULLY IMPLEMENTED
+    enable: yes          # Activate this DB engine   # NOT FULLY IMPLEMENTED
     file: 'db.sqlite3'  # The filename of the database
 
 redis:
@@ -77,10 +77,10 @@ site:
     download-url: 'http://pastebin.com/raw.php?i={id}'
     update-max: 50
     update-min: 40
- 
+  
   pastie.org:
     archive-url: 'http://pastie.org/pastes'
-    archive-regex: '<a href="http://pastie.org/pastes/(\d{7})">'
+    archive-regex: '<a href="http://pastie.org/pastes/(\d+)">'
     download-url: 'http://pastie.org/pastes/{id}/text'
 
 # Site seems offline now
@@ -89,21 +89,18 @@ site:
 #    archive-regex: '<a href="http://nopaste.me/paste/([a-zA-Z0-9]+)">'
 #    download-url: 'http://nopaste.me/download/{id}.txt'
 
-  slexy.org:
-    archive-url: 'http://slexy.org/recent' 
-    archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
-    download-url: 'http://slexy.org/raw/{id}'
 
-  pastesite.com:
-    pastie-classname: PastiePasteSiteCom
-    archive-url: 'http://pastesite.com/recent' 
-    archive-regex: '<a href="(\d+)" title="View this Paste'
-    download-url: 'http://pastesite.com/plain/{id}.txt'
+# off line
+# pastesite.com:
+#    pastie-classname: PastiePasteSiteCom
+#    archive-url: 'http://pastesite.com/recent' 
+#    archive-regex: '<a href="(\d+)" title="View this Paste'
+#    download-url: 'http://pastesite.com/plain/{id}.txt'
 
-#  gist.github.com:
-#    archive-url: 'https://gist.github.com/gists'
-#    archive-regex: '<span><a href="/([0-9]+)">gist'
-#    download-url: 'https://raw.github.com/gist/{id}'
+  gist.github.com:
+    archive-url: 'https://gist.github.com/discover'
+    archive-regex: '<a href="/([a-zA-Z0-9]+/[a-z0-9]+)">'
+    download-url: https://gist.githubusercontent.com/{id}/raw/
     
   codepad.org:
     archive-url: 'http://codepad.org/recent'
@@ -123,17 +120,20 @@ site:
     archive-regex: '<link>https://snipt.net/(.+)/</link>'
     download-url: 'https://snipt.net/{id}/'
 
-#  safebin.net:  # FIXME not finished
-#    archive-url: 'http://safebin.net/?archive'
-#    archive-regex: '<a title="[a-zA-Z0-9 :,]+" href="/([0-9]+)">'
-#    download-url: 'http://safebin.net/{id}'
-#    update-max: 60
-#    update-min: 50
+  ideone.com:
+    archive-url: 'http://ideone.com/recent'
+    archive-regex: '<a href="/([a-zA-Z0-9]+)">#'
+    download-url: 'http://ideone.com/plain/{id}'
 
+  justpaste.it:
+    archive-url: 'https://justpaste.it/topall'
+    archive-regex: '<a href="https://justpaste.it/([a-zA-Z0-9]+)">'
+    download-url: 'https://justpaste.it/{id}'
 
 # TODO
 # http://www.safebin.net/       # more complex site
 # http://www.heypasteit.com/    # http://www.heypasteit.com/clip/0IZA => incremental 
+# paste.bradleygill.com 	#incremental
 
 # http://hastebin.com/          # no list of last pastes
 # http://sebsauvage.net/paste/  # no list of last pastes
