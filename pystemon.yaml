@@ -80,7 +80,7 @@ site:
  
   pastie.org:
     archive-url: 'http://pastie.org/pastes'
-    archive-regex: '<a href="http://pastie.org/pastes/(\d{7})">'
+    archive-regex: '<a href="http://pastie.org/pastes/(\d+)">'
     download-url: 'http://pastie.org/pastes/{id}/text'
 
 # Site seems offline now
@@ -89,22 +89,18 @@ site:
 #    archive-regex: '<a href="http://nopaste.me/paste/([a-zA-Z0-9]+)">'
 #    download-url: 'http://nopaste.me/download/{id}.txt'
 
-  slexy.org:
-    archive-url: 'http://slexy.org/recent' 
-    archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
-    download-url: 'http://slexy.org/raw/{id}'
+# off line
+# pastesite.com:
+#    pastie-classname: PastiePasteSiteCom
+#    archive-url: 'http://pastesite.com/recent' 
+#    archive-regex: '<a href="(\d+)" title="View this Paste'
+#    download-url: 'http://pastesite.com/plain/{id}.txt'
 
-  pastesite.com:
-    pastie-classname: PastiePasteSiteCom
-    archive-url: 'http://pastesite.com/recent' 
-    archive-regex: '<a href="(\d+)" title="View this Paste'
-    download-url: 'http://pastesite.com/plain/{id}.txt'
+  gist.github.com:
+    archive-url: 'https://gist.github.com/discover'
+    archive-regex: '<a href="/([a-zA-Z0-9]+/[a-z0-9]+)">'
+    download-url: https://gist.githubusercontent.com/{id}/raw/
 
-#  gist.github.com:
-#    archive-url: 'https://gist.github.com/gists'
-#    archive-regex: '<span><a href="/([0-9]+)">gist'
-#    download-url: 'https://raw.github.com/gist/{id}'
-    
   codepad.org:
     archive-url: 'http://codepad.org/recent'
     archive-regex: '<a href="http://codepad.org/([a-zA-Z0-9]+)">view'
@@ -122,13 +118,16 @@ site:
     archive-url: 'https://snipt.net/public/?rss'
     archive-regex: '<link>https://snipt.net/(.+)/</link>'
     download-url: 'https://snipt.net/{id}/'
+	
+  ideone.com:
+    archive-url: 'http://ideone.com/recent'
+    archive-regex: '<a href="/([a-zA-Z0-9]+)">#'
+    download-url: 'http://ideone.com/plain/{id}'
 
-#  safebin.net:  # FIXME not finished
-#    archive-url: 'http://safebin.net/?archive'
-#    archive-regex: '<a title="[a-zA-Z0-9 :,]+" href="/([0-9]+)">'
-#    download-url: 'http://safebin.net/{id}'
-#    update-max: 60
-#    update-min: 50
+  justpaste.it:
+    archive-url: 'https://justpaste.it/topall'
+    archive-regex: '<a href="https://justpaste.it/([a-zA-Z0-9]+)">'
+    download-url: 'https://justpaste.it/{id}'
 
 
 # TODO
