@@ -859,6 +859,10 @@ def parseConfigFile(configfile):
             logger.error("Proxy enabled but not set. Set single-proxy or use random with a file")
     if yamlconfig['user-agent']['random']:
         loadUserAgentsFromFile(yamlconfig['user-agent']['file'])
+    if yamlconfig['syslog']['enable']:
+        slhdlr = logging.handlers.SysLogHandler( facility=logging.handlers.SysLogHandler.LOG_DAEMON )
+        slhdlr.setFormatter( logging.Formatter('pystemon %(message)s') )
+        logger.addHandler(slhdlr)
     if yamlconfig['redis']['queue']:
         global redis
         import redis

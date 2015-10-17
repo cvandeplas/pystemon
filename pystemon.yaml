@@ -1,6 +1,9 @@
 #network:		# Network settings
 #  ip: '1.1.1.1'	# Specify source IP address if you want to bind on a specific one
 
+syslog:
+  enable: yes           # enable syslog
+
 archive:
   save: yes             # Keep 
   save-all: no          # Keep a copy of all pasties
