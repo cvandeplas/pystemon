@@ -860,8 +860,8 @@ def parseConfigFile(configfile):
     if yamlconfig['user-agent']['random']:
         loadUserAgentsFromFile(yamlconfig['user-agent']['file'])
     if yamlconfig['redis']['queue']:
-		global redis
-		import redis
+	global redis
+	import redis
 
 
 if __name__ == "__main__":
