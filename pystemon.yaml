@@ -209,7 +209,7 @@ site:
   
   paste.debian.net:
     archive-url: 'http://paste.debian.net/'
-    archive-regedx: '<a href=''//paste.debian.net/(\d+)'
+    archive-regex: '<a href=''//paste.debian.net/(\d+)'
     download-url: 'http://paste.debian.net/plain/{id}'
   
   kpaste.net:
