@@ -81,7 +81,7 @@ site:
     update-max: 95
     update-min: 85
 
-# See https:/bastebin.com/api_scraping_faq , you will need a pro accout on pastebin
+# See https:/pastebin.com/api_scraping_faq , you will need a pro accout on pastebin
 #  pastebin.com_pro:
 #    archive-url: 'http://pastebin.com/api_scraping.php?linmit=500'
 #    archive-regex: '"key": "(.+)",'
@@ -216,6 +216,11 @@ site:
     archive-url: 'http://kpaste.net/'
     archive-regex: '" href="/(\w+)">'
     download-url: 'http://kpaste.net/(id)?raw'
+	
+  pastebay.org:
+    archive-url: 'http://pastebay.org/index.php/lists'
+    archive-regex: '<a href="http://pastebay.org/index.php/view/(\d+)'
+    download-url: 'http:pastebay.org/index.php/view/raw/{id}'
 
 # TODO
 # http://www.safebin.net/       # more complex site
