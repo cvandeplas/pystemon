@@ -95,7 +95,7 @@ site:
     download-url: 'http://pastie.org/pastes/{id}/text'
 
   slexy.org:
-    archive-url: 'http://slexy.org/recent' 
+    archive-url: 'http://slexy.org/recent/' 
     archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
     download-url: 'http://slexy.org/raw/{id}'
 
@@ -168,7 +168,7 @@ site:
     download-url: 'http://snipplr.com/view/{id}'
  
   lpaste.net:
-    archive-url: 'http://lpaste.net/brows'
+    archive-url: 'http://lpaste.net/browse'
     archive-regex: '<a href="/(\d+)"'
     download-url: 'http://lpaste.net/raw/{id}'
 
@@ -215,7 +215,7 @@ site:
   kpaste.net:
     archive-url: 'http://kpaste.net/'
     archive-regex: '" href="/(\w+)">'
-    download-url: 'http://kpaste.net/(id)?raw'
+    download-url: 'http://kpaste.net/{id}?raw'
 	
   pastebay.org:
     archive-url: 'http://pastebay.org/index.php/lists'
