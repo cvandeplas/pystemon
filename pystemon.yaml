@@ -17,7 +17,7 @@ db:
     file: 'db.sqlite3'  # The filename of the database
 
 redis:
-  queue: yes
+  queue: no
   server: "localhost"
   port: 6379
   database: 10
@@ -216,7 +216,7 @@ site:
     archive-url: 'http://kpaste.net/'
     archive-regex: '" href="/(\w+)">'
     download-url: 'http://kpaste.net/{id}?raw'
-	
+
   pastebay.org:
     archive-url: 'http://pastebay.org/index.php/lists'
     archive-regex: '<a href="http://pastebay.org/index.php/view/(\d+)'
