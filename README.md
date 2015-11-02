@@ -2,6 +2,20 @@ pystemon
 ========
 Monitoring tool for PasteBin-alike sites written in Python
 
+Features added and bugs fixed in this fork:
+------------------------------------------
+* update-min and update-max are now honoured
+* added option to enable or disable proxy use
+* added option to enable single or random proxy (random proxies are still removed after a few errors)
+* disabled redis by default
+* redis dependency only loaded if redis is enabled
+
+My original fork can be found here https://github.com/cvandeplas/pystemon/pull/26. Meanwhile others have contributed to this repo :)
+
+
+Original README below:
+----------------------
+
 Copyleft AGPLv3 - Christophe Vandeplas - christophe@vandeplas.com  
 Feel free to use the code, but please share the changes you've made
 
