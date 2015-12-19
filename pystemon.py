@@ -44,7 +44,7 @@ import urllib2
 try:
     import yaml
 except:
-    exit('ERROR: Cannot import the yaml Python library. Are you sure you installed it?')
+    exit('ERROR: Cannot import the yaml Python library. Are you sure it is installed?')
 
 try:
     if sys.version_info < (2, 7):
@@ -348,7 +348,7 @@ Below (after newline) is the content of the pastie:
 
 {content}
 
-        '''.format(site=self.site.name, url=self.url, matches=self.matches_to_regex(), content=self.pastie_content)
+        '''.format(site=self.site.name, url=self.url, matches=self.matches_to_regex(), content=self.pastie_content.encode('utf8'))
         msg.attach(MIMEText(message))
         # send out the mail
         try:
@@ -807,6 +807,8 @@ def parse_config_file(configfile):
     global yamlconfig
     try:
         yamlconfig = yaml.load(file(configfile))
+        for includes in yamlconfig.get("includes", []):
+            yamlconfig.update(yaml.load(open(includes)))
     except yaml.YAMLError, exc:
         logger.error("Error in configuration file:")
         if hasattr(exc, 'problem_mark'):
@@ -819,7 +821,11 @@ def parse_config_file(configfile):
     if yamlconfig['user-agent']['random']:
         load_user_agents_from_file(yamlconfig['user-agent']['file'])
     if yamlconfig['redis']['queue']:
-    	import redis
+        try:
+            import redis
+        except:
+            exit('ERROR: Cannot import the redis Python library. Are you sure it is installed?')
+
 
 
 if __name__ == "__main__":
@@ -838,10 +844,17 @@ if __name__ == "__main__":
 
     if not options.config:
         # try to read out the default configuration files if -c option is not set
+        # the order is the following: (1 is highest)
+        # 3/ /etc/pystemon.yaml
+        # 2/ ./pystemon.yaml
+        # 1/ ./<name-of-the-application.yaml
         if os.path.isfile('/etc/pystemon.yaml'):
             options.config = '/etc/pystemon.yaml'
         if os.path.isfile('pystemon.yaml'):
             options.config = 'pystemon.yaml'
+        if os.path.isfile(sys.argv[0].replace('.py', '.yaml')):
+            options.config = sys.argv[0].replace('.py', '.yaml')
+
     if not os.path.isfile(options.config):
         parser.error('Configuration file not found. Please create /etc/pystemon.yaml, pystemon.yaml or specify a config file using the -c option.')
         exit(1)
