@@ -547,7 +547,7 @@ def load_user_agents_from_file(filename):
 
 
 def get_random_user_agent():
-    global proxies_list
+    global user_agents_list
     if user_agents_list:
         return random.choice(user_agents_list)
     return None
