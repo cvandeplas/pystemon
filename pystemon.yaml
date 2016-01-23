@@ -1,9 +1,9 @@
-#network:		# Network settings
-#  ip: '1.1.1.1'	# Specify source IP address if you want to bind on a specific one
+#network:   # Network settings
+#  ip: '1.1.1.1'  # Specify source IP address if you want to bind on a specific one
 
 archive:
   save: yes             # Keep 
-  save-all: no          # Keep a copy of all pasties
+  save-all: yes          # Keep a copy of all pasties
   dir: "alerts"         # Directory where matching pasties should be kept
   dir-all: "archive"    # Directory where all pasties should be kept (if save-all is set to yes)
   compress: yes         # Store the pasties compressed
@@ -74,7 +74,7 @@ site:
   pastebin.com:
     archive-url: 'http://pastebin.com/archive'
     archive-regex: '<a href="/(\w{8})">.+</a></td>'
-    download-url: 'http://pastebin.com/raw.php?i={id}'
+    download-url: 'http://pastebin.com/raw/{id}'
     update-max: 50
     update-min: 40
 
