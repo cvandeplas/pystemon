@@ -865,7 +865,7 @@ def parse_config_file(configfile):
         load_proxies_from_file(yamlconfig['proxy']['file'])
     if yamlconfig['user-agent']['random']:
         load_user_agents_from_file(yamlconfig['user-agent']['file'])
-    if yamlconfig['mongo']['database']:
+    if yamlconfig['mongo']['save']:
         try:
             from pymongo import MongoClient
             client = MongoClient(yamlconfig['mongo']['url']) 
