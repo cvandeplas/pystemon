@@ -13,6 +13,12 @@ db:
     enable: no          # Activate this DB engine   # NOT FULLY IMPLEMENTED
     file: 'db.sqlite3'  # The filename of the database
 
+mongo:
+    save: no
+    database: "paste"
+    collection: "paste"
+    url: "mongodb://localhost"
+
 redis:
   queue: no
   server: "localhost"
