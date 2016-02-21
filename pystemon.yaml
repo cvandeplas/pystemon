@@ -14,10 +14,10 @@ db:
     file: 'db.sqlite3'  # The filename of the database
 
 mongo:
-    save: no
-    database: "paste"
-    collection: "paste"
-    url: "mongodb://localhost"
+  save: no
+  database: "paste"
+  collection: "paste"
+  url: "mongodb://localhost"
 
 redis:
   queue: no
