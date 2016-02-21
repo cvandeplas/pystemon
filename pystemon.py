@@ -299,6 +299,8 @@ class Pastie():
         # Save pastie to disk if configured
         if yamlconfig['archive']['save']:
             self.save_pastie(self.site.save_dir)
+        if yamlconfig['mongo']['save']:
+            self.save_mongo()
         # Send email alert if configured
         if yamlconfig['email']['alert']:
             self.send_email_alert()
@@ -323,6 +325,13 @@ class Pastie():
             return unicode(descriptions)
         else:
             return ''
+    
+    def save_mongo(self):
+        content = self.pastie_content.encode('utf8')
+        hash = hashlib.md5()
+        hash.update(content)
+        
+        mongo_col.insert({"hash":hash.hexdigest(), "matches": self.matches, "content":content})
 
     def send_email_alert(self):
         msg = MIMEMultipart()
@@ -856,6 +865,20 @@ def parse_config_file(configfile):
         load_proxies_from_file(yamlconfig['proxy']['file'])
     if yamlconfig['user-agent']['random']:
         load_user_agents_from_file(yamlconfig['user-agent']['file'])
+    if yamlconfig['mongo']['database']:
+        try:
+            from pymongo import MongoClient
+            client = MongoClient(yamlconfig['mongo']['url']) 
+
+            database = yamlconfig['mongo']['database']
+            db = client[database]
+            collection = yamlconfig['mongo']['collection']
+            global mongo_col
+            mongo_col = db[collection]
+
+
+        except:
+            exit('ERROR: Cannot import PyMongo. Are you sure it is installed ?')
     if yamlconfig['redis']['queue']:
         try:
             import redis
