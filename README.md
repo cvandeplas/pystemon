@@ -24,6 +24,7 @@ Python Dependencies
 -------------------
 * PyYAML
 * BeautifulSoup
+* PyMongo (For Optional Mongodb support)
 
 Limitations:
 ------------
