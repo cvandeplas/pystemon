@@ -31,7 +31,7 @@ email:
   to: alert@example.com
   server: 127.0.0.1     # Address of the server (hostname or IP)
   port: 25              # Outgoing SMTP port: 25, 587, ...
-  tls: yes             # Enable/disable tls support
+  tls: no             # Enable/disable tls support
   username: ''          # (optional) Username for authentication. Leave blank for no authentication.
   password: ''          # (optional) Password for authentication. Leave blank for no authentication.
   subject: '[pystemon] - {subject}'
