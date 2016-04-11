@@ -363,6 +363,8 @@ Below (after newline) is the content of the pastie:
         # send out the mail
         try:
             s = smtplib.SMTP(yamlconfig['email']['server'], yamlconfig['email']['port'])
+            if yamlconfig['email']['tls']:
+                s.starttls()
             # login to the SMTP server if configured
             if 'username' in yamlconfig['email'] and yamlconfig['email']['username']:
                 s.login(yamlconfig['email']['username'], yamlconfig['email']['password'])
