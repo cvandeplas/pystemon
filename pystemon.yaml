@@ -39,6 +39,9 @@ email:
 #####
 # Definition of regular expressions to search for in the pasties
 # 
+# If user-regex is enabled then search regexs are disabled!
+user-regex: no
+# or
 search:
 #  - description: ''    # (optional) A human readable description. (used in alerting)
 #    search: ''         # The regular expression to search for
@@ -173,3 +176,9 @@ proxy:
 user-agent:
   random: no
   file: 'user-agents.txt'
+  
+#####
+# Configuration section for REGEX file
+#
+regex:
+  file: 'user-regex.json'
