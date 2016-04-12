@@ -578,6 +578,7 @@ def main():
 
 user_regex_list = []
 
+
 def load_user_regex_from_file(filename):
     global user_regex_list
     try:
@@ -600,6 +601,7 @@ def load_user_regex_from_file(filename):
 
 
 user_agents_list = []
+
 
 def load_user_agents_from_file(filename):
     global user_agents_list
