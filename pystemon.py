@@ -596,7 +596,7 @@ class ThreadProxyList(threading.Thread):
            if mtime != self.last_mtime:
                 logger.debug('Proxy configuration file changed. Reloading proxy list.')
                 proxies_lock.acquire()
-                loadProxiesFromFile(self.filename)
+                load_proxies_from_file(self.filename)
                 self.last_mtime = mtime
                 proxies_lock.release()
 
