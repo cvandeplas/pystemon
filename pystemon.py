@@ -265,6 +265,31 @@ class Pastie():
             self.search_content()
         return self.pastie_content
 
+    def search_content_from_regex(self):
+        if not self.pastie_content:
+            raise SystemExit('BUG: Content not set, cannot search')
+            return False
+        # search for the regexes in the htmlPage
+        for regex in user_regex_list:
+            # LATER first compile regex, then search using compiled version
+            regex_flags = re.IGNORECASE
+            if 'regex-flags' in regex and regex['regex-flags'] != "":
+                regex_flags = eval(regex['regex-flags'])
+            m = re.findall(regex['search'], self.pastie_content, regex_flags)
+            if m:
+                # the regex matches the text
+                # ignore if not enough counts
+                if 'count' in regex and len(m) < int(regex['count']):
+                    continue
+                # ignore if exclude
+                if 'exclude' in regex and regex['exclude'] != "" and re.search(regex['exclude'], self.pastie_content, regex_flags):
+                    continue
+                # we have a match, add to match list
+                self.matches.append(regex)
+        if self.matches:
+            self.action_on_match()
+
+    
     def search_content(self):
         if not self.pastie_content:
             raise SystemExit('BUG: Content not set, cannot search')
@@ -548,9 +573,30 @@ def main():
                 t.kill_received = True
             exit(0)  # quit immediately
 
+user_regex_list = []
+
+def load_user_regex_from_file(filename):
+    global user_regex_list
+    try:
+        f = open(filename)
+    except Exception, e:
+        logger.error('Configuration problem: user-regex-file "{file}" not found or not readable: {e}'.format(file=filename, e=e))
+    txt = f.read()
+    f.close()
+    data = json.loads(txt)
+    for subject in data:
+        exclude = data[subject][0]["exclude"]
+        count = data[subject][0]["count"]
+        searches = data[subject][0]["search"]
+        flags = data[subject][0]["regex-flags"]
+        for search in searches:
+            user_regex_list.append(
+                    {"description": subject, "exclude": exclude, "count": count, "search": search, "regex-flags": flags}
+            )
+    logger.debug('Found {count} User regex in file "{file}"'.format(file=filename, count=len(user_regex_list)))
+
 
 user_agents_list = []
-
 
 def load_user_agents_from_file(filename):
     global user_agents_list
