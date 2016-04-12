@@ -262,7 +262,10 @@ class Pastie():
             if yamlconfig['archive']['save-all']:
                 self.save_pastie(self.site.archive_dir)
             # search for data in pastie
-            self.search_content()
+            if yamlconfig['user-regex']:
+                self.search_content_from_regex()
+            else:
+                self.search_content()
         return self.pastie_content
 
     def search_content_from_regex(self):
