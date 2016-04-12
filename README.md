@@ -19,6 +19,7 @@ Features:
 * (optional) uses random proxies
 * removes a proxy if it is unreliable (fails 5 times)
 * (optional) compress saved files with Gzip. (no zip to limit external dependencies)
+* (optional) use custom json search/regex list
 
 Python Dependencies
 -------------------
