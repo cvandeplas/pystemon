@@ -1,0 +1,10 @@
+{
+    "subject": [
+      {
+        "regex-flags": "",
+        "exclude": "",
+        "count": 0,
+        "search": ["regex1", "regex2", "regex3"]
+      }
+    ]
+}
