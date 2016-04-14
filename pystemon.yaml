@@ -115,10 +115,10 @@ site:
     archive-regex: '<a href="(\d+)" title="View this Paste'
     download-url: 'http://pastesite.com/plain/{id}.txt'
 
-#  gist.github.com:
-#    archive-url: 'https://gist.github.com/gists'
-#    archive-regex: '<span><a href="/([0-9]+)">gist'
-#    download-url: 'https://raw.github.com/gist/{id}'
+  gist.github.com:
+    archive-url: 'https://gist.github.com/discover'
+    archive-regex: '<a href="/([A-Za-z0-9]+/[A-Za-z0-9]+)">'
+    download-url: 'https://gist.githubusercontent.com/{id}/raw/'
     
   codepad.org:
     archive-url: 'http://codepad.org/recent'
