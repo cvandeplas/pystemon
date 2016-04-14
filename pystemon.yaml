@@ -109,11 +109,12 @@ site:
     archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
     download-url: 'http://slexy.org/raw/{id}'
 
-  pastesite.com:
-    pastie-classname: PastiePasteSiteCom
-    archive-url: 'http://pastesite.com/recent' 
-    archive-regex: '<a href="(\d+)" title="View this Paste'
-    download-url: 'http://pastesite.com/plain/{id}.txt'
+#Site is no longer accepting new users or pastes
+# pastesite.com:
+#   pastie-classname: PastiePasteSiteCom
+#   archive-url: 'http://pastesite.com/recent' 
+#   archive-regex: '<a href="(\d+)" title="View this Paste'
+#   download-url: 'http://pastesite.com/plain/{id}.txt'
 
 #  gist.github.com:
 #    archive-url: 'https://gist.github.com/gists'
