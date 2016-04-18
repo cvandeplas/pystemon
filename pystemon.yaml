@@ -126,6 +126,12 @@ site:
     archive-regex: '<a href="http://codepad.org/([a-zA-Z0-9]+)">view'
     download-url: 'http://codepad.org/{id}/raw.txt'
     
+  ideone.com:
+    archive-url: 'http://ideone.com/recent'
+    archive-regex: '<a href="/([a-zA-Z0-9]+)">#'
+    download-url: 'http://ideone.com/plain/{id}'
+
+    
 # Site seems offline now
 #  cdv.lt:
 #    pastie-classname: PastieCdvLt
