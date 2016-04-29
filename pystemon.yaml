@@ -141,6 +141,12 @@ site:
     archive-regex: '" href="/(\w+)">'
     download-url: 'http://kpaste.net/{id}?raw'
     
+  ideone.com:
+    archive-url: 'http://ideone.com/recent'
+    archive-regex: '<a href="/([a-zA-Z0-9]+)">#'
+    download-url: 'http://ideone.com/plain/{id}'
+
+    
 # Site seems offline now
 #  cdv.lt:
 #    pastie-classname: PastieCdvLt
