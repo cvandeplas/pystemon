@@ -120,6 +120,11 @@ site:
     archive-url: 'https://gist.github.com/discover'
     archive-regex: '<a href="/([A-Za-z0-9]+/[A-Za-z0-9]+)">'
     download-url: 'https://gist.githubusercontent.com/{id}/raw/'
+  
+  quickleak.se:
+    archive-url: 'http://www.quickleak.se/last-pastes.html'
+    archive-regex: '<td><a href="([A-Za-z0-9]+)">'
+    download-url: 'http://www.quickleak.se/{id}'
     
   codepad.org:
     archive-url: 'http://codepad.org/recent'
