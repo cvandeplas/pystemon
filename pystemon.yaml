@@ -143,11 +143,11 @@ site:
 #    archive-regex: '<a href="/([a-zA-Z0-9]+)">[0-9]'
 #    download-url: 'http://cdv.lt/api/snippet/{id}'
 
-  snipt.net:
-    pastie-classname: PastieSniptNet
-    archive-url: 'https://snipt.net/public/?rss'
-    archive-regex: '<link>https://snipt.net/(.+)/</link>'
-    download-url: 'https://snipt.net/{id}/'
+  # snipt.net:
+  #   pastie-classname: PastieSniptNet
+  #   archive-url: 'https://snipt.net/public/?rss'
+  #   archive-regex: '<link>https://snipt.net/(.+)/</link>'
+  #   download-url: 'https://snipt.net/{id}/'
 
 #  safebin.net:  # FIXME not finished
 #    archive-url: 'http://safebin.net/?archive'
