@@ -147,6 +147,12 @@ site:
     download-url: 'http://ideone.com/plain/{id}'
 
     
+  pastebin.ru:
+    archive-url: 'http://pastebin.ru/'
+    archive-regex: '<a href="/(\w+)">'
+    download-url: 'http://pastebin.ru/{id}'
+
+    
 # Site seems offline now
 #  cdv.lt:
 #    pastie-classname: PastieCdvLt
