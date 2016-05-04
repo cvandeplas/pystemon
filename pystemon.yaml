@@ -95,7 +95,7 @@ site:
 
   pastie.org:
     archive-url: 'http://pastie.org/pastes'
-    archive-regex: '<a href="http://pastie.org/pastes/(\d{7})">'
+    archive-regex: '<a href="http://pastie.org/pastes/(\d+)">'
     download-url: 'http://pastie.org/pastes/{id}/text'
 
 # Site seems offline now
