@@ -10,7 +10,6 @@ To be implemented:
 - FIXME set all the config options in the class variables
 - FIXME validate parsing of config file
 - FIXME use syslog logging
-- TODO runs as a daemon in background
 - TODO save files in separate directories depending on the day/week/month. Try to avoid duplicate files
 '''
 
@@ -887,6 +886,24 @@ def parse_config_file(configfile):
         except:
             exit('ERROR: Cannot import the redis Python library. Are you sure it is installed?')
 
+def main_as_daemon():
+    try:
+        # Store the Fork PID
+        pid = os.fork()
+
+        if pid > 0:
+            pid_file = open('pid', 'w')
+            pid_file.write(str(pid))
+            pid_file.close()
+            print 'pystemon started as daemon'
+            print 'PID: %d' % pid
+            os._exit(0)
+
+    except OSError, error:
+        logger.error('Unable to fork, can\'t run as daemon. Error: {id} {error}'.format(id=error.errno, error=error.strerror))
+        os._exit(1)
+
+    main()
 
 
 if __name__ == "__main__":
@@ -895,7 +912,9 @@ if __name__ == "__main__":
     parser.add_option("-c", "--config", dest="config",
                       help="load configuration from file", metavar="FILE")
     parser.add_option("-d", "--daemon", action="store_true", dest="daemon",
-                      help="runs in background as a daemon (NOT IMPLEMENTED)")
+                      help="runs in background as a daemon")
+    parser.add_option("-k", "--kill", action="store_true", dest="kill",
+                      help="kill pystemon daemon")                  
     parser.add_option("-s", "--stats", action="store_true", dest="stats",
                       help="display statistics about the running threads (NOT IMPLEMENTED)")
     parser.add_option("-v", action="store_true", dest="verbose",
@@ -922,18 +941,29 @@ if __name__ == "__main__":
 
     logger = logging.getLogger('pystemon')
     logger.setLevel(logging.INFO)
-    hdlr = logging.StreamHandler(sys.stdout)
     formatter = logging.Formatter('[%(asctime)s] %(message)s')
-    hdlr.setFormatter(formatter)
-    logger.addHandler(hdlr)
-    if options.verbose:
-        logger.setLevel(logging.DEBUG)
+
+    if not options.daemon:
+        hdlr = logging.StreamHandler(sys.stdout)
+        hdlr.setFormatter(formatter)
+        logger.addHandler(hdlr)
 
     if options.daemon:
         # send logging to syslog if using daemon
-        logger.addHandler(logging.handlers.SysLogHandler(facility=logging.handlers.SysLogHandler.LOG_DAEMON))
-        # FIXME run application in background
+        # logger.addHandler(logging.handlers.SysLogHandler(facility=logging.handlers.SysLogHandler.LOG_DAEMON))
+        logger.addHandler(logging.handlers.SysLogHandler(address='/dev/log'))
 
     parse_config_file(options.config)
     # run the software
-    main()
+    if options.kill:
+        if os.path.isfile('pid'):
+            f = open('pid', 'r')
+            pid = f.read()
+            f.close()
+            os.kill(int(pid), 9)
+            os._exit(0)
+    if options.daemon:
+        main_as_daemon()
+    else:
+        main()
+
