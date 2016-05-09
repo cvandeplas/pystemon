@@ -19,6 +19,7 @@ Features:
 * (optional) uses random proxies
 * removes a proxy if it is unreliable (fails 5 times)
 * (optional) compress saved files with Gzip. (no zip to limit external dependencies)
+* can run as daemon
 
 Python Dependencies
 -------------------
@@ -39,7 +40,8 @@ Options:
       -h, --help            show this help message and exit  
       -c FILE, --config=FILE  
                             load configuration from file  
-      -d, --daemon          runs in background as a daemon (NOT IMPLEMENTED)  
+      -d, --daemon          runs in background as a daemon  
+      -k, --kill            kill pystemon daemon
       -s, --stats           display statistics about the running threads (NOT IMPLEMENTED)    
       -v                    outputs more information  
 
