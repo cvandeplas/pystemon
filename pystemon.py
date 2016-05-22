@@ -960,7 +960,9 @@ if __name__ == "__main__":
             f = open('pid', 'r')
             pid = f.read()
             f.close()
+            os.remove('pid')
             os.kill(int(pid), 9)
+            print "pystemon stopped, pid: " + pid
             os._exit(0)
     if options.daemon:
         main_as_daemon()
