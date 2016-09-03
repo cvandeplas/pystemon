@@ -334,8 +334,7 @@ class Pastie():
         
         mongo_col.insert({"hash":hash.hexdigest(), "matches": self.matches, "content":content})
     def send_telegram(self):
-        alert = "Found hit for {matches} in pastie {url}".format(matches=self.matches_to_text(), url=self.url)
-        # headers
+        # get token of bot telegram and chatId
         token = yamlconfig['telegram']['token']
         chatId = yamlconfig['telegram']['chatId']
 
