@@ -26,8 +26,8 @@ redis:
   database: 10
 telegram:
   alert: no
-  token:0
-  chatId:0
+  token: 0
+  chatId: 0
 email:
   alert: no             # Enable/disable email alerts
   from: alert@example.com
