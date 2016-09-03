@@ -41,6 +41,7 @@ import threading
 import time
 import urllib
 import urllib2
+import requests
 try:
     import yaml
 except:
@@ -303,7 +304,8 @@ class Pastie():
         # Send email alert if configured
         if yamlconfig['email']['alert']:
             self.send_email_alert()
-
+        if yamlconfig['telegram']['alert']
+            self.send_telegram()
     def matches_to_text(self):
         descriptions = []
         for match in self.matches:
@@ -331,7 +333,24 @@ class Pastie():
         hash.update(content)
         
         mongo_col.insert({"hash":hash.hexdigest(), "matches": self.matches, "content":content})
+    def send_telegram(self):
+        alert = "Found hit for {matches} in pastie {url}".format(matches=self.matches_to_text(), url=self.url)
+        # headers
+        token = yamlconfig['telegram']['token']
+        chatId = yamlconfig['telegram']['chatId']
 
+        message = '''
+I found a hit for a regular expression on one of the pastebin sites.
+
+The site where the paste came from :        {site}
+The original paste was located here:        {url}
+And the regular expressions that matched:   {matches}
+
+Below (after newline) is the content of the pastie:
+
+{content}'''.format(site=self.site.name, url=self.url, matches=self.matches_to_regex(), content=self.pastie_content.encode('utf8'))
+        url = 'https://api.telegram.org/bot{0}/sendMessage'.format(token)
+        req= r.post(url, data={'chat_id': chatId, 'text': message})
     def send_email_alert(self):
         msg = MIMEMultipart()
         alert = "Found hit for {matches} in pastie {url}".format(matches=self.matches_to_text(), url=self.url)
