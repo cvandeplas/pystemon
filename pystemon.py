@@ -3,7 +3,7 @@
 
 '''
 @author:     Christophe Vandeplas <christophe@vandeplas.com>
-@copyright:  AGPLv3 
+@copyright:  AGPLv3
              http://www.gnu.org/licenses/agpl.html
 
 To be implemented:
@@ -304,7 +304,7 @@ class Pastie():
         # Send email alert if configured
         if yamlconfig['email']['alert']:
             self.send_email_alert()
-        if yamlconfig['telegram']['alert']
+        if yamlconfig['telegram']['alert']:
             self.send_telegram()
     def matches_to_text(self):
         descriptions = []
@@ -326,12 +326,12 @@ class Pastie():
             return unicode(descriptions)
         else:
             return ''
-    
+
     def save_mongo(self):
         content = self.pastie_content.encode('utf8')
         hash = hashlib.md5()
         hash.update(content)
-        
+
         mongo_col.insert({"hash":hash.hexdigest(), "matches": self.matches, "content":content})
     def send_telegram(self):
         # get token of bot telegram and chatId
@@ -349,7 +349,7 @@ Below (after newline) is the content of the pastie:
 
 {content}'''.format(site=self.site.name, url=self.url, matches=self.matches_to_regex(), content=self.pastie_content.encode('utf8'))
         url = 'https://api.telegram.org/bot{0}/sendMessage'.format(token)
-        req= r.post(url, data={'chat_id': chatId, 'text': message})
+        req= requests.post(url, data={'chat_id': chatId, 'text': message})
     def send_email_alert(self):
         msg = MIMEMultipart()
         alert = "Found hit for {matches} in pastie {url}".format(matches=self.matches_to_text(), url=self.url)
@@ -887,7 +887,7 @@ def parse_config_file(configfile):
     if yamlconfig['mongo']['save']:
         try:
             from pymongo import MongoClient
-            client = MongoClient(yamlconfig['mongo']['url']) 
+            client = MongoClient(yamlconfig['mongo']['url'])
 
             database = yamlconfig['mongo']['database']
             db = client[database]
@@ -932,7 +932,7 @@ if __name__ == "__main__":
     parser.add_option("-d", "--daemon", action="store_true", dest="daemon",
                       help="runs in background as a daemon")
     parser.add_option("-k", "--kill", action="store_true", dest="kill",
-                      help="kill pystemon daemon")                  
+                      help="kill pystemon daemon")
     parser.add_option("-s", "--stats", action="store_true", dest="stats",
                       help="display statistics about the running threads (NOT IMPLEMENTED)")
     parser.add_option("-v", action="store_true", dest="verbose",
