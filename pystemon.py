@@ -3,7 +3,7 @@
 
 '''
 @author:     Christophe Vandeplas <christophe@vandeplas.com>
-@copyright:  AGPLv3 
+@copyright:  AGPLv3
              http://www.gnu.org/licenses/agpl.html
 
 To be implemented:
@@ -78,6 +78,7 @@ class PastieSite(threading.Thread):
 
         self.name = name
         self.download_url = download_url
+        self.public_url = download_url
         self.archive_url = archive_url
         self.archive_regex = archive_regex
         try:
@@ -100,6 +101,7 @@ class PastieSite(threading.Thread):
         self.seen_pasties = deque('', 1000)  # max number of pasties ids in memory
 
     def run(self):
+        logger.info('Thread for Pastiesite {} started'.format(self.name))
         while not self.kill_received:
             sleep_time = random.randint(self.update_min, self.update_max)
             try:
@@ -214,6 +216,7 @@ class Pastie():
         self.matches = []
         self.md5 = None
         self.url = self.site.download_url.format(id=self.id)
+        self.public_url = self.site.public_url.format(id=self.id)
 
     def hash_pastie(self):
         if self.pastie_content:
@@ -290,7 +293,7 @@ class Pastie():
 
     def action_on_match(self):
         msg = 'Found hit for {matches} in pastie {url}'.format(
-            matches=self.matches_to_text(), url=self.url)
+            matches=self.matches_to_text(), url=self.public_url)
         logger.info(msg)
         # store info in DB
         if db:
@@ -324,17 +327,17 @@ class Pastie():
             return unicode(descriptions)
         else:
             return ''
-    
+
     def save_mongo(self):
         content = self.pastie_content.encode('utf8')
         hash = hashlib.md5()
         hash.update(content)
-        
+
         mongo_col.insert({"hash":hash.hexdigest(), "matches": self.matches, "content":content})
 
     def send_email_alert(self):
         msg = MIMEMultipart()
-        alert = "Found hit for {matches} in pastie {url}".format(matches=self.matches_to_text(), url=self.url)
+        alert = "Found hit for {matches} in pastie {url}".format(matches=self.matches_to_text(), url=self.public_url)
         # headers
         msg['Subject'] = yamlconfig['email']['subject'].format(subject=alert)
         msg['From'] = yamlconfig['email']['from']
@@ -357,7 +360,7 @@ Below (after newline) is the content of the pastie:
 
 {content}
 
-        '''.format(site=self.site.name, url=self.url, matches=self.matches_to_regex(), content=self.pastie_content.encode('utf8'))
+        '''.format(site=self.site.name, url=self.public_url, matches=self.matches_to_regex(), content=self.pastie_content.encode('utf8'))
         msg.attach(MIMEText(message))
         # send out the mail
         try:
@@ -525,6 +528,8 @@ def main():
                       yamlconfig['site'][site_name]['download-url'],
                       yamlconfig['site'][site_name]['archive-url'],
                       yamlconfig['site'][site_name]['archive-regex'])
+        if 'public-url' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['public-url']:
+            t.public_url = yamlconfig['site'][site_name]['public-url']
         if 'update-min' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['update-min']:
             t.update_min = yamlconfig['site'][site_name]['update-min']
         if 'update-max' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['update-max']:
@@ -541,10 +546,10 @@ def main():
             for t in threads:
                 t.join(1)
         except KeyboardInterrupt:
-            print ''
-            print "Ctrl-c received! Sending kill to threads..."
+            logger.info('signal received! Sending kill to threads ...')
             for t in threads:
                 t.kill_received = True
+            logger.info('exiting')
             exit(0)  # quit immediately
 
 
@@ -590,6 +595,7 @@ class ThreadProxyList(threading.Thread):
         self.kill_received = False
 
     def run(self):
+        logger.info('ThreadProxyList started')
         while not self.kill_received:
            mtime = os.stat(self.filename).st_mtime
            if mtime != self.last_mtime:
@@ -766,6 +772,7 @@ class Sqlite3Database(threading.Thread):
         self.c = None
 
     def run(self):
+        logger.info('Thread for Sqlite3Database started')
         self.db_conn = sqlite3.connect(self.filename)
         # create the db if it doesn't exist
         self.c = self.db_conn.cursor()
@@ -869,7 +876,7 @@ def parse_config_file(configfile):
     if yamlconfig['mongo']['save']:
         try:
             from pymongo import MongoClient
-            client = MongoClient(yamlconfig['mongo']['url']) 
+            client = MongoClient(yamlconfig['mongo']['url'])
 
             database = yamlconfig['mongo']['database']
             db = client[database]
@@ -903,6 +910,7 @@ def main_as_daemon():
         logger.error('Unable to fork, can\'t run as daemon. Error: {id} {error}'.format(id=error.errno, error=error.strerror))
         os._exit(1)
 
+    logger.info('Starting up ...')
     main()
 
 
@@ -914,7 +922,7 @@ if __name__ == "__main__":
     parser.add_option("-d", "--daemon", action="store_true", dest="daemon",
                       help="runs in background as a daemon")
     parser.add_option("-k", "--kill", action="store_true", dest="kill",
-                      help="kill pystemon daemon")                  
+                      help="kill pystemon daemon")
     parser.add_option("-s", "--stats", action="store_true", dest="stats",
                       help="display statistics about the running threads (NOT IMPLEMENTED)")
     parser.add_option("-v", action="store_true", dest="verbose",
@@ -941,17 +949,19 @@ if __name__ == "__main__":
 
     logger = logging.getLogger('pystemon')
     logger.setLevel(logging.INFO)
-    formatter = logging.Formatter('[%(asctime)s] %(message)s')
 
     if not options.daemon:
+        formatter = logging.Formatter('[%(asctime)s] %(message)s')
         hdlr = logging.StreamHandler(sys.stdout)
         hdlr.setFormatter(formatter)
         logger.addHandler(hdlr)
 
     if options.daemon:
         # send logging to syslog if using daemon
-        # logger.addHandler(logging.handlers.SysLogHandler(facility=logging.handlers.SysLogHandler.LOG_DAEMON))
-        logger.addHandler(logging.handlers.SysLogHandler(address='/dev/log'))
+        formatter = logging.Formatter('pystemon[%(process)d]: %(message)s')
+        hdlr = logging.handlers.SysLogHandler(address='/dev/log', facility=logging.handlers.SysLogHandler.LOG_DAEMON)
+        hdlr.setFormatter(formatter)
+        logger.addHandler(hdlr)
 
     parse_config_file(options.config)
     # run the software
@@ -961,8 +971,11 @@ if __name__ == "__main__":
             pid = f.read()
             f.close()
             os.remove('pid')
-            os.kill(int(pid), 9)
-            print "pystemon stopped, pid: " + pid
+            print "Sending signal to pid: {}".format(pid)
+            os.kill(int(pid), 2)
+            os._exit(0)
+        else:
+            print "PID file not found. Nothing to do."
             os._exit(0)
     if options.daemon:
         main_as_daemon()
