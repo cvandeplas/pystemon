@@ -37,7 +37,7 @@ email:
   subject: '[pystemon] - {subject}'
 
 pushover:
-  alert: yes
+  alert: no
   token: "app_token"
   user: "user_key"
 
