@@ -212,6 +212,7 @@ def verify_directory_exists(directory):
 class Pastie():
     def __init__(self, site, pastie_id):
         self.site = site
+        self.notify_alert = False
         self.id = pastie_id
         self.pastie_content = None
         self.matches = []
@@ -287,6 +288,9 @@ class Pastie():
                 # ignore if exclude
                 if 'exclude' in regex and re.search(regex['exclude'], self.pastie_content, regex_flags):
                     continue
+                #Verify Notofication
+                if 'notify_alert' in regex:
+                    self.notify_alert = True
                 # we have a match, add to match list
                 self.matches.append(regex)
         if self.matches:
@@ -305,10 +309,10 @@ class Pastie():
         if yamlconfig['mongo']['save']:
             self.save_mongo()
         # Send email alert if configured
-        if yamlconfig['email']['alert']:
+        if yamlconfig['email']['alert'] and self.notify_alert:
             self.send_email_alert()
         # Send pushover alert if configured
-        if yamlconfig['pushover']['alert']:
+        if yamlconfig['pushover']['alert'] and self.notify_alert:
             self.send_pushover_alert()
 
     def matches_to_text(self):
@@ -1009,4 +1013,3 @@ if __name__ == "__main__":
         main_as_daemon()
     else:
         main()
-
