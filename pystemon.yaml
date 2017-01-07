@@ -36,6 +36,11 @@ email:
   password: ''          # (optional) Password for authentication. Leave blank for no authentication.
   subject: '[pystemon] - {subject}'
 
+pushover:
+  alert: yes
+  token: "app_token"
+  user: "user_key"
+
 #####
 # Definition of regular expressions to search for in the pasties
 #
@@ -58,6 +63,7 @@ search:
     search: 'download'
     exclude: 'porn|sex|teen'
     count: 4
+
 
 #####
 # Configuration section for the paste sites

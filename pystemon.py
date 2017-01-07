@@ -41,6 +41,7 @@ import threading
 import time
 import urllib
 import urllib2
+import httplib
 try:
     import yaml
 except:
@@ -306,6 +307,9 @@ class Pastie():
         # Send email alert if configured
         if yamlconfig['email']['alert']:
             self.send_email_alert()
+        # Send pushover alert if configured
+        if yamlconfig['pushover']['alert']:
+            self.send_pushover_alert()
 
     def matches_to_text(self):
         descriptions = []
@@ -378,6 +382,30 @@ Below (after newline) is the content of the pastie:
         except Exception, e:
             logger.error("ERROR: unable to send email. Are your email setting correct?: {e}".format(e=e))
 
+    def send_pushover_alert(self):
+        alert = "Found hit for {matches} in pastie {url}".format(matches=self.matches_to_text(), url=self.url)
+       # headers
+        tokenID = yamlconfig['pushover']['token']
+        userID = yamlconfig['pushover']['user']
+ 
+        message = '''
+I found a hit for a regular expression on one of the pastebin sites.
+ 
+The site where the paste came from :        {site}
+The original paste was located here:        {url}
+And the regular expressions that matched:   {matches}
+ 
+Below (after newline) is the content of the pastie:
+  
+{content}'''.format(site=self.site.name, url=self.url, matches=self.matches_to_regex(), content=self.pastie_content.encode('utf8'))
+        conn = httplib.HTTPSConnection("api.pushover.net:443")
+        conn.request("POST", "/1/messages.json",
+          urllib.urlencode({
+            "token": tokenID,
+            "user": userID,
+            "message": message,
+          }), { "Content-type": "application/x-www-form-urlencoded" })
+        conn.getresponse()
 
 class PastiePasteSiteCom(Pastie):
     '''
