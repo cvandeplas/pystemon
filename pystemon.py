@@ -19,8 +19,15 @@ except ImportError:
     from Queue import Queue
 from collections import deque
 from datetime import datetime
-from email.MIMEMultipart import MIMEMultipart
-from email.MIMEText import MIMEText
+try:
+    from email.mime.multipart import MIMEMultipart
+except ImportError:
+    from email.MIMEMultipart import MIMEMultipart
+
+try:
+    from email.mime.text import MIMEText
+except ImportError:
+    from email.MIMEText import MIMEText
 import gzip
 import hashlib
 import logging.handlers
@@ -139,8 +146,8 @@ class PastieSite(threading.Thread):
         # reset the pasties list
         pasties = []
         # populate queue with data
-        rawblob, headers = download_url(self.archive_url)
-        htmlPage = rawblob.read().decode()
+        response = download_url(self.archive_url)
+        htmlPage = response.text
         if not htmlPage:
             logger.warning("No HTML content for page {url}".format(url=self.archive_url))
             return False
@@ -236,8 +243,8 @@ class Pastie():
                 logger.error('Pastie {site} {id} md5 problem: {e}'.format(site=self.site.name, id=self.id, e=e))
 
     def fetch_pastie(self):
-        rawblob, headers = download_url(self.url)
-        self.pastie_content = rawblob.read()
+        response = download_url(self.url)
+        self.pastie_content = response.content
         return self.pastie_content
 
     def save_pastie(self, directory):
@@ -682,10 +689,10 @@ def failed_proxy(proxy):
 def download_url(url, data=None, cookie=None, loop_client=0, loop_server=0):
     # Client errors (40x): if more than 5 recursions, give up on URL (used for the 404 case)
     if loop_client >= retries_client:
-        return None, None
+        return None
     # Server errors (50x): if more than 100 recursions, give up on URL
     if loop_server >= retries_server:
-        return None, None
+        return None
 
     session = requests.Session()
     random_proxy = get_random_proxy()
@@ -740,8 +747,8 @@ def download_url(url, data=None, cookie=None, loop_client=0, loop_server=0):
                     time.sleep(60)
                     return download_url(url)
             logger.warning("ERROR: HTTP Error ##### {e} ######################## {url}".format(e=e, url=url))
-            return None, None
-        return response.raw, response.headers
+            return None
+        return response
     except URLError as e:
         logger.debug("ERROR: URL Error ##### {e} ######################## ".format(e=e, url=url))
         if random_proxy:  # remove proxy from the list if needed
@@ -756,7 +763,7 @@ def download_url(url, data=None, cookie=None, loop_client=0, loop_server=0):
             logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
             time.sleep(60)
             return download_url(url, loop_server=loop_server)
-        return None, None
+        return None
     except socket.timeout:
         logger.debug("ERROR: timeout ############################# " + url)
         if random_proxy:  # remove proxy from the list if needed
@@ -765,7 +772,7 @@ def download_url(url, data=None, cookie=None, loop_client=0, loop_server=0):
             loop_server += 1
             logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
             return download_url(url, loop_server=loop_server)
-        return None, None
+        return None
     except Exception as e:
         failed_proxy(random_proxy)
         logger.warning("Failed to download the page because of other HTTPlib error proxy error {0} trying again.".format(url))
