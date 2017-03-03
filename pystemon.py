@@ -42,9 +42,15 @@ import time
 import urllib
 import urllib2
 try:
+
+    import redis
+except:
+    exit('ERROR: Cannot import the redis Python library. Are you sure it is installed?')
+
+try:
     import yaml
 except:
-    exit('ERROR: Cannot import the yaml Python library. Are you sure you installed it?')
+    exit('ERROR: Cannot import the yaml Python library. Are you sure it is installed?')
 
 try:
     if sys.version_info < (2, 7):
@@ -348,7 +354,7 @@ Below (after newline) is the content of the pastie:
 
 {content}
 
-        '''.format(site=self.site.name, url=self.url, matches=self.matches_to_regex(), content=self.pastie_content)
+        '''.format(site=self.site.name, url=self.url, matches=self.matches_to_regex(), content=self.pastie_content.encode('utf8'))
         msg.attach(MIMEText(message))
         # send out the mail
         try:
@@ -814,6 +820,8 @@ def parse_config_file(configfile):
             logger.error("error position: (%s:%s)" % (mark.line + 1, mark.column + 1))
             exit(1)
     # TODO verify validity of config parameters
+    for includes in yamlconfig.get("includes", []):
+        yamlconfig.update(yaml.load(open(includes))) 
     if yamlconfig['proxy']['random']:
         load_proxies_from_file(yamlconfig['proxy']['file'])
     if yamlconfig['user-agent']['random']:
@@ -842,6 +850,11 @@ if __name__ == "__main__":
             options.config = '/etc/pystemon.yaml'
         if os.path.isfile('pystemon.yaml'):
             options.config = 'pystemon.yaml'
+	filename = sys.argv[0]
+        config_file = filename.replace('.py', '.yaml')
+        if os.path.isfile(config_file):
+            options.config = config_file
+        print options.config
     if not os.path.isfile(options.config):
         parser.error('Configuration file not found. Please create /etc/pystemon.yaml, pystemon.yaml or specify a config file using the -c option.')
         exit(1)
