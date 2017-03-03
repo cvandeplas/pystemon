@@ -2,7 +2,7 @@
 #  ip: '1.1.1.1'	# Specify source IP address if you want to bind on a specific one
 
 archive:
-  save: yes             # Keep 
+  save: yes             # Keep
   save-all: no          # Keep a copy of all pasties
   dir: "alerts"         # Directory where matching pasties should be kept
   dir-all: "archive"    # Directory where all pasties should be kept (if save-all is set to yes)
@@ -31,7 +31,7 @@ email:
 
 #####
 # Definition of regular expressions to search for in the pasties
-# 
+#
 search:
 #  - description: ''    # (optional) A human readable description. (used in alerting)
 #    search: ''         # The regular expression to search for
@@ -58,12 +58,12 @@ search:
 threads: 1              # number of download threads per site
 site:
 #  example.com:
-#    archive-url:       # the url where the list of last pasties is present 
+#    archive-url:       # the url where the list of last pasties is present
 #                       # example: 'http://pastebin.com/archive'
 #    archive-regex:     # a regular expression to extract the pastie-id from the page.
 #                       # do not forget the () to extract the pastie-id
 #                       # example: '<a href="/(\w{8})">.+</a></td>'
-#    download-url:      # url for the raw pastie.    
+#    download-url:      # url for the raw pastie.
 #                       # Should contain {id} on the place where the ID of the pastie needs to be placed
 #                       # example: 'http://pastebin.com/raw.php?i={id}'
 #    update-max: 40     # every X seconds check for new updates to see if new pasties are available
@@ -93,43 +93,24 @@ site:
 
 # Site seems offline now
 #  nopaste.me:
-#    archive-url: 'http://nopaste.me/recent' 
+#    archive-url: 'http://nopaste.me/recent'
 #    archive-regex: '<a href="http://nopaste.me/paste/([a-zA-Z0-9]+)">'
 #    download-url: 'http://nopaste.me/download/{id}.txt'
 
   slexy.org:
-    archive-url: 'http://slexy.org/recent' 
+    archive-url: 'http://slexy.org/recent'
     archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
     download-url: 'http://slexy.org/raw/{id}'
-
-  pastesite.com:
-    pastie-classname: PastiePasteSiteCom
-    archive-url: 'http://pastesite.com/recent' 
-    archive-regex: '<a href="(\d+)" title="View this Paste'
-    download-url: 'http://pastesite.com/plain/{id}.txt'
 
 #  gist.github.com:
 #    archive-url: 'https://gist.github.com/gists'
 #    archive-regex: '<span><a href="/([0-9]+)">gist'
 #    download-url: 'https://raw.github.com/gist/{id}'
-    
+
   codepad.org:
     archive-url: 'http://codepad.org/recent'
     archive-regex: '<a href="http://codepad.org/([a-zA-Z0-9]+)">view'
     download-url: 'http://codepad.org/{id}/raw.txt'
-    
-# Site seems offline now
-#  cdv.lt:
-#    pastie-classname: PastieCdvLt
-#    archive-url: 'http://cdv.lt/snippets'
-#    archive-regex: '<a href="/([a-zA-Z0-9]+)">[0-9]'
-#    download-url: 'http://cdv.lt/api/snippet/{id}'
-
-  snipt.net:
-    pastie-classname: PastieSniptNet
-    archive-url: 'https://snipt.net/public/?rss'
-    archive-regex: '<link>https://snipt.net/(.+)/</link>'
-    download-url: 'https://snipt.net/{id}/'
 
 #  safebin.net:  # FIXME not finished
 #    archive-url: 'http://safebin.net/?archive'
@@ -141,7 +122,7 @@ site:
 
 # TODO
 # http://www.safebin.net/       # more complex site
-# http://www.heypasteit.com/    # http://www.heypasteit.com/clip/0IZA => incremental 
+# http://www.heypasteit.com/    # http://www.heypasteit.com/clip/0IZA => incremental
 
 # http://hastebin.com/          # no list of last pastes
 # http://sebsauvage.net/paste/  # no list of last pastes
