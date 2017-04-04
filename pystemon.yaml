@@ -81,9 +81,9 @@ site:
 #                       # This is practical for sites that require custom fetchPastie() functions
 
   pastebin.com:
-    archive-url: 'http://pastebin.com/archive'
+    archive-url: 'https://pastebin.com/archive'
     archive-regex: '<a href="/(\w{8})">.+</a></td>'
-    download-url: 'http://pastebin.com/raw/{id}'
+    download-url: 'https://pastebin.com/raw/{id}'
     update-max: 50
     update-min: 40
 
