@@ -96,16 +96,16 @@ site:
     update-max: 50
     update-min: 40
 
-  pastie.org:
-    archive-url: 'http://pastie.org/pastes'
-    archive-regex: '<a href="http://pastie.org/pastes/(\d+)">'
-    download-url: 'http://pastie.org/pastes/{id}/text'
-
 # Site seems offline now
-#  nopaste.me:
-#    archive-url: 'http://nopaste.me/recent'
-#    archive-regex: '<a href="http://nopaste.me/paste/([a-zA-Z0-9]+)">'
-#    download-url: 'http://nopaste.me/download/{id}.txt'
+#  pastie.org:
+#    archive-url: 'http://pastie.org/pastes'
+#    archive-regex: '<a href="http://pastie.org/pastes/(\d+)">'
+#    download-url: 'http://pastie.org/pastes/{id}/text'
+
+  nopaste.me:
+    archive-url: 'https://nopaste.me/lists'
+    archive-regex: '<a href="https:\/\/nopaste.me\/view/([a-zA-Z0-9]+)">'
+    download-url: 'https://nopaste.me/view/raw/{id}'
 
   slexy.org:
     archive-url: 'http://slexy.org/recent'
@@ -124,10 +124,11 @@ site:
     archive-regex: '<a href="/([A-Za-z0-9]+/[A-Za-z0-9]+)">'
     download-url: 'https://gist.githubusercontent.com/{id}/raw/'
 
-  quickleak.se:
-    archive-url: 'http://www.quickleak.se/last-pastes.html'
-    archive-regex: '<td><a href="([A-Za-z0-9]+)">'
-    download-url: 'http://www.quickleak.se/{id}'
+# Site seems offline now
+#  quickleak.se:
+#    archive-url: 'http://www.quickleak.se/last-pastes.html'
+#    archive-regex: '<td><a href="([A-Za-z0-9]+)">'
+#    download-url: 'http://www.quickleak.se/{id}'
 
   codepad.org:
     archive-url: 'http://codepad.org/recent'
