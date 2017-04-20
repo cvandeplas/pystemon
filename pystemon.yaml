@@ -57,6 +57,7 @@ search:
 #                       #  example: 're.MULTILINE + re.DOTALL + re.IGNORECASE'
 #    to: ''             # (optional) Additional recipients for email alert, comma separated list
 #    notify_alert:''    #  ability to set notification on different regex
+#    flag: ''           # add the ability to define flags for the message
 
   - search: '[^a-zA-Z0-9]example\.com'
   - search: '[^a-zA-Z0-9]foobar\.com'
