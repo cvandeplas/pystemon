@@ -336,6 +336,16 @@ class Pastie():
         else:
             return ''
 
+ #set FLAG for messages
+    def matches_to_regex_flag(self):
+        descriptions = []
+        for match in self.matches:
+            descriptions.append(match['flag'])
+        if descriptions:
+            return unicode(descriptions)
+        else:
+            return ''       
+
     def save_mongo(self):
         content = self.pastie_content.encode('utf8')
         hash = hashlib.md5()
@@ -358,6 +368,7 @@ class Pastie():
         msg['To'] = ','.join(recipients)  # here the list needs to be comma separated
         # message body including full paste rather than attaching it
         message = '''
+{flag}       
 I found a hit for a regular expression on one of the pastebin sites.
 
 The site where the paste came from :        {site}
@@ -368,7 +379,7 @@ Below (after newline) is the content of the pastie:
 
 {content}
 
-        '''.format(site=self.site.name, url=self.public_url, matches=self.matches_to_regex(), content=self.pastie_content.encode('utf8'))
+        '''.format(site=self.site.name, url=self.public_url, matches=self.matches_to_regex(), flag=self.matches_to_regex_flag(), content=self.pastie_content.encode('utf8'))
         msg.attach(MIMEText(message))
         # send out the mail
         try:
@@ -393,6 +404,7 @@ Below (after newline) is the content of the pastie:
         userID = yamlconfig['pushover']['user']
  
         message = '''
+{flag}
 I found a hit for a regular expression on one of the pastebin sites.
  
 The site where the paste came from :        {site}
@@ -401,7 +413,7 @@ And the regular expressions that matched:   {matches}
  
 Below (after newline) is the content of the pastie:
   
-{content}'''.format(site=self.site.name, url=self.url, matches=self.matches_to_regex(), content=self.pastie_content.encode('utf8'))
+{content}'''.format(site=self.site.name, url=self.url, matches=self.matches_to_regex(), flag=self.matches_to_regex_flag(), content=self.pastie_content.encode('utf8'))
         conn = httplib.HTTPSConnection("api.pushover.net:443")
         conn.request("POST", "/1/messages.json",
           urllib.urlencode({
