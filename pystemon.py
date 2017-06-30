@@ -340,11 +340,12 @@ class Pastie():
     def matches_to_regex_flag(self):
         descriptions = []
         for match in self.matches:
-            descriptions.append(match['flag'])
-        if descriptions:
+            if 'flag' in match:
+                descriptions.append(match['flag'])
+        if descriptions :
             return unicode(descriptions)
         else:
-            return ''       
+            return ''         
 
     def save_mongo(self):
         content = self.pastie_content.encode('utf8')
