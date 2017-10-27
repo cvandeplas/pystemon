@@ -42,6 +42,11 @@ import time
 import urllib
 import urllib2
 try:
+    import redis
+except ImportError:
+    exit('ERROR: Cannot import the redis Python library. Are you sure it is installed?')
+
+try:
     import yaml
 except:
     exit('ERROR: Cannot import the yaml Python library. Are you sure it is installed?')
@@ -271,8 +276,37 @@ class Pastie():
         if not self.pastie_content:
             raise SystemExit('BUG: Content not set, cannot search')
             return False
+
+        # loop through "item-list-file" : these files contains list of words
+        for item in yamlconfig['search']:
+            tmplist = []
+            if not 'item-list-file' in item:
+                continue
+            with open(item['item-list-file'], 'r') as f:
+                for s in f:
+                    s = s.encode().strip()
+                    if s.lower() in self.pastie_content.lower():
+                        tmplist.append(s)
+
+            # ignore if not enough counts
+            if 'count' in item and len(tmplist) < int(item['count']):
+                continue
+            # ignore if exclude
+            if 'exclude' in item and re.search(item['exclude'].encode(), self.pastie_content, re.IGNORECASE):
+                continue
+            # report results
+            tmp = {}
+            if len(tmplist) > 1:
+                tmp['search'] = ', '.join(tmplist)
+            else:
+                tmp['search'] = ''.join(tmplist)
+            tmp['description'] = item['description']
+            self.matches.append(tmp)
+
         # search for the regexes in the htmlPage
         for regex in yamlconfig['search']:
+            if 'item-list-file' in item:
+                continue
             # LATER first compile regex, then search using compiled version
             regex_flags = re.IGNORECASE
             if 'regex-flags' in regex:
