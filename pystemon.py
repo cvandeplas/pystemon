@@ -124,7 +124,7 @@ class PastieSite(threading.Thread):
                 msg = 'Thread for {name} crashed unexpectectly, '\
                       'recovering...: {e}'.format(name=self.name, e=e)
                 logger.error(msg)
-                logger.debug(traceback.format_exc())
+                logger.error(traceback.format_exc())
             time.sleep(sleep_time)
 
     def get_last_pasties(self):
@@ -927,6 +927,7 @@ if __name__ == "__main__":
                       help="display statistics about the running threads (NOT IMPLEMENTED)")
     parser.add_option("-v", action="store_true", dest="verbose",
                       help="outputs more information")
+    parser.add_option("--debug", action="store_true", dest="debug", help="enable debugging output")
 
     (options, args) = parser.parse_args()
 
@@ -948,7 +949,11 @@ if __name__ == "__main__":
         exit(1)
 
     logger = logging.getLogger('pystemon')
-    logger.setLevel(logging.INFO)
+    if options.debug:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
+
 
     if not options.daemon:
         formatter = logging.Formatter('[%(asctime)s] %(message)s')
