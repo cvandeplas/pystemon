@@ -81,18 +81,18 @@ site:
 #                       # This is practical for sites that require custom fetchPastie() functions
 
   pastebin.com:
-    archive-url: 'http://pastebin.com/archive'
+    archive-url: 'https://pastebin.com/archive'
     archive-regex: '<a href="/(\w{8})">.+</a></td>'
-    download-url: 'http://pastebin.com/raw/{id}'
+    download-url: 'https://pastebin.com/raw/{id}'
     update-max: 50
     update-min: 40
 
   # See https://pastebin.com/api_scraping_faq , you will need a pro account on pastebin
   pastebin.com_pro:
-    archive-url: 'http://pastebin.com/api_scraping.php?limit=500'
+    archive-url: 'https://pastebin.com/api_scraping.php?limit=500'
     archive-regex: '"key": "(.+)",'
-    download-url: 'http://pastebin.com/api_scrape_item.php?i={id}'
-    public-url: 'http://pastebin.com/raw/{id}'
+    download-url: 'https://pastebin.com/api_scrape_item.php?i={id}'
+    public-url: 'https://pastebin.com/raw/{id}'
     update-max: 50
     update-min: 40
 
