@@ -880,6 +880,14 @@ def parse_config_file(configfile):
 
             database = yamlconfig['mongo']['database']
             db = client[database]
+
+            mongoUsername  = yamlconfig['mongo']['user']
+            mongoPassword = yamlconfig['mongo']['password']
+            if mongoUsername and mongoPassword:
+                try:
+                    db.authenticate(name=mongoUsername, password=mongoPassword)
+                except Exception as e:
+                    exit('ERROR: Authentication failed')
             collection = yamlconfig['mongo']['collection']
             global mongo_col
             mongo_col = db[collection]
