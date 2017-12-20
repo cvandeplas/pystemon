@@ -96,10 +96,11 @@ site:
     update-max: 50
     update-min: 40
 
-  pastie.org:
-    archive-url: 'http://pastie.org/pastes'
-    archive-regex: '<a href="http://pastie.org/pastes/(\d+)">'
-    download-url: 'http://pastie.org/pastes/{id}/text'
+# Site seems offline now
+#  pastie.org:
+#    archive-url: 'http://pastie.org/pastes'
+#    archive-regex: '<a href="http://pastie.org/pastes/(\d+)">'
+#    download-url: 'http://pastie.org/pastes/{id}/text'
 
 # Site seems offline now
 #  nopaste.me:
@@ -107,10 +108,11 @@ site:
 #    archive-regex: '<a href="http://nopaste.me/paste/([a-zA-Z0-9]+)">'
 #    download-url: 'http://nopaste.me/download/{id}.txt'
 
-  slexy.org:
-    archive-url: 'http://slexy.org/recent'
-    archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
-    download-url: 'http://slexy.org/raw/{id}'
+# slexy.org has become complex. The paste must be viewed before accessing the raw content
+#  slexy.org:
+#    archive-url: 'https://slexy.org/recent'
+#    archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
+#    download-url: 'https://slexy.org/raw/{id}'
 
 #Site is no longer accepting new users or pastes
 # pastesite.com:
@@ -124,10 +126,11 @@ site:
     archive-regex: '<a href="/([A-Za-z0-9]+/[A-Za-z0-9]+)">'
     download-url: 'https://gist.githubusercontent.com/{id}/raw/'
 
-  quickleak.se:
-    archive-url: 'http://www.quickleak.se/last-pastes.html'
-    archive-regex: '<td><a href="([A-Za-z0-9]+)">'
-    download-url: 'http://www.quickleak.se/{id}'
+# Site seems offline now
+#  quickleak.se:
+#    archive-url: 'http://www.quickleak.se/last-pastes.html'
+#    archive-regex: '<td><a href="([A-Za-z0-9]+)">'
+#    download-url: 'http://www.quickleak.se/{id}'
 
   codepad.org:
     archive-url: 'http://codepad.org/recent'
@@ -135,9 +138,9 @@ site:
     download-url: 'http://codepad.org/{id}/raw.txt'
 
   pastebin.ca:
-    archive-url: 'http://pastebin.ca'
-    archive-regex: 'rel="/preview.php\?id=(\d+)'
-    download-url: 'http://pastebin.ca/{id}'
+    archive-url: 'https://pastebin.ca/rss/posts.rss'
+    archive-regex: '/(\d+)</link>'
+    download-url: 'https://pastebin.ca/raw/{id}'
 
   kpaste.net:
     archive-url: 'http://kpaste.net/'
@@ -145,9 +148,9 @@ site:
     download-url: 'http://kpaste.net/{id}?raw'
 
   ideone.com:
-    archive-url: 'http://ideone.com/recent'
+    archive-url: 'https://ideone.com/recent'
     archive-regex: '<a href="/([a-zA-Z0-9]+)">#'
-    download-url: 'http://ideone.com/plain/{id}'
+    download-url: 'https://ideone.com/plain/{id}'
 
 
   pastebin.ru:
