@@ -108,9 +108,9 @@ site:
 #    download-url: 'http://nopaste.me/download/{id}.txt'
 
   slexy.org:
-    archive-url: 'http://slexy.org/recent'
+    archive-url: 'https://slexy.org/recent'
     archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
-    download-url: 'http://slexy.org/raw/{id}'
+    download-url: 'https://slexy.org/raw/{id}'
 
 #Site is no longer accepting new users or pastes
 # pastesite.com:
