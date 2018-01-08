@@ -408,6 +408,30 @@ class PastiePasteSiteCom(Pastie):
         return self.pastie_content
 
 
+class PastieSlexyOrg(Pastie):
+    '''
+    Custom Pastie class for the pastesite.com site
+    This class overloads the fetch_pastie function to do the form
+    submit to get the raw pastie
+    '''
+
+    def __init__(self, site, pastie_id):
+        Pastie.__init__(self, site, pastie_id)
+
+    def fetch_pastie(self):
+        validation_form_page, headers = download_url(self.url)
+        if validation_form_page:
+            htmlDom = BeautifulSoup(validation_form_page)
+            if not htmlDom:
+                return self.pastie_content
+            a = htmlDom.find('a', {'target': '_blank'})
+            if not a:
+                return self.pastie_content
+            url = "https://slexy.org{}".format(a['href'])
+            self.pastie_content, headers = download_url(url)
+        return self.pastie_content
+
+
 class PastieCdvLt(Pastie):
     '''
     Custom Pastie class for the cdv.lt site

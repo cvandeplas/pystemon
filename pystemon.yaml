@@ -3,7 +3,7 @@
 
 archive:
   save: yes             # Keep
-  save-all: yes          # Keep a copy of all pasties
+  save-all: yes         # Keep a copy of all pasties
   dir: "alerts"         # Directory where matching pasties should be kept
   dir-all: "archive"    # Directory where all pasties should be kept (if save-all is set to yes)
   compress: yes         # Store the pasties compressed
@@ -110,7 +110,8 @@ site:
   slexy.org:
     archive-url: 'https://slexy.org/recent'
     archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
-    download-url: 'https://slexy.org/raw/{id}'
+    download-url: 'https://slexy.org/view/{id}'
+    pastie-classname: PastieSlexyOrg
 
 #Site is no longer accepting new users or pastes
 # pastesite.com:
