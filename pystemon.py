@@ -412,6 +412,7 @@ class PastieCdvLt(Pastie):
     This class overloads the fetch_pastie function to do the form submit
     to get the raw pastie
     '''
+
     def __init__(self, site, pastie_id):
         Pastie.__init__(self, site, pastie_id)
 
@@ -432,6 +433,7 @@ class PastieSniptNet(Pastie):
     This class overloads the fetch_pastie function to do the form submit
     to get the raw pastie
     '''
+
     def __init__(self, site, pastie_id):
         Pastie.__init__(self, site, pastie_id)
 
@@ -597,8 +599,8 @@ class ThreadProxyList(threading.Thread):
     def run(self):
         logger.info('ThreadProxyList started')
         while not self.kill_received:
-           mtime = os.stat(self.filename).st_mtime
-           if mtime != self.last_mtime:
+            mtime = os.stat(self.filename).st_mtime
+            if mtime != self.last_mtime:
                 logger.debug('Proxy configuration file changed. Reloading proxy list.')
                 proxies_lock.acquire()
                 load_proxies_from_file(self.filename)
@@ -647,6 +649,7 @@ class NoRedirectHandler(urllib2.HTTPRedirectHandler):
     This class is only necessary to not follow HTTP redirects in webpages.
     It is used by the download_url() function
     '''
+
     def http_error_302(self, req, fp, code, msg, headers):
         infourl = urllib2.addinfourl(fp, headers, req.get_full_url())
         infourl.status = code
