@@ -2,7 +2,7 @@
 #  ip: '1.1.1.1'  # Specify source IP address if you want to bind on a specific one
 
 archive:
-  save: yes             # Keep
+  save: yes             # Keep a copy of pasties that triggered alerts
   save-all: yes         # Keep a copy of all pasties
   dir: "alerts"         # Directory where matching pasties should be kept
   dir-all: "archive"    # Directory where all pasties should be kept (if save-all is set to yes)
