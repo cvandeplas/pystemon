@@ -18,6 +18,8 @@ mongo:
   database: "paste"
   collection: "paste"
   url: "mongodb://localhost"
+  user:
+  password:
 
 redis:
   queue: no
