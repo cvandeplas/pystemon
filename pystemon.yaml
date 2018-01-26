@@ -2,7 +2,7 @@
 #  ip: '1.1.1.1'  # Specify source IP address if you want to bind on a specific one
 
 archive:
-  save: yes             # Keep
+  save: yes             # Keep a copy of pasties that triggered alerts
   save-all: yes         # Keep a copy of all pasties
   dir: "alerts"         # Directory where matching pasties should be kept
   dir-all: "archive"    # Directory where all pasties should be kept (if save-all is set to yes)
@@ -40,8 +40,11 @@ email:
 # Definition of regular expressions to search for in the pasties
 #
 search:
-#  - description: ''    # (optional) A human readable description. (used in alerting)
-#    search: ''         # The regular expression to search for
+#  - description: ''    # (optional) A human readable description used in alerts.
+#                       #            If left unspecified the search regular expression
+#                       #            will be used as description.
+#    search: ''         # The regular expression to search for. Multiple regular expressions
+#                       #            can be used under a single description.
 #    count: ''          # (optional) How many hits should it have to be interesting?
 #    exclude: ''        # (optional) Do not alert if this regular expression matches
 #    regex-flags: ''    # (optional) Regular expression flags to give to the find function.
