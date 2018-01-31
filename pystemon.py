@@ -45,6 +45,10 @@ try:
     import yaml
 except:
     exit('ERROR: Cannot import the yaml Python library. Are you sure it is installed?')
+try:
+    import redis
+except:
+    pass
 
 try:
     if sys.version_info < (2, 7):
@@ -924,8 +928,8 @@ def parse_config_file(configfile):
         except:
             exit('ERROR: Cannot import PyMongo. Are you sure it is installed ?')
     if yamlconfig['redis']['queue']:
-        try:
-            import redis
+        try: # Check if redis is defined. If not, the module is not loaded
+            redis
         except:
             exit('ERROR: Cannot import the redis Python library. Are you sure it is installed?')
 
