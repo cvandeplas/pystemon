@@ -2,8 +2,8 @@
 #  ip: '1.1.1.1'  # Specify source IP address if you want to bind on a specific one
 
 archive:
-  save: yes             # Keep
-  save-all: yes          # Keep a copy of all pasties
+  save: yes             # Keep a copy of pasties that triggered alerts
+  save-all: yes         # Keep a copy of all pasties
   dir: "alerts"         # Directory where matching pasties should be kept
   dir-all: "archive"    # Directory where all pasties should be kept (if save-all is set to yes)
   compress: yes         # Store the pasties compressed
@@ -18,6 +18,8 @@ mongo:
   database: "paste"
   collection: "paste"
   url: "mongodb://localhost"
+  user:
+  password:
 
 redis:
   queue: no
@@ -40,8 +42,11 @@ email:
 # Definition of regular expressions to search for in the pasties
 #
 search:
-#  - description: ''    # (optional) A human readable description. (used in alerting)
-#    search: ''         # The regular expression to search for
+#  - description: ''    # (optional) A human readable description used in alerts.
+#                       #            If left unspecified the search regular expression
+#                       #            will be used as description.
+#    search: ''         # The regular expression to search for. Multiple regular expressions
+#                       #            can be used under a single description.
 #    item-list-file: '' # Alternatively, you can monitor a list of words (one per line) in this file
 #    count: ''          # (optional) How many hits should it have to be interesting?
 #    exclude: ''        # (optional) Do not alert if this regular expression matches
@@ -109,11 +114,11 @@ site:
 #    archive-regex: '<a href="http://nopaste.me/paste/([a-zA-Z0-9]+)">'
 #    download-url: 'http://nopaste.me/download/{id}.txt'
 
-# slexy.org has become complex. The paste must be viewed before accessing the raw content
-#  slexy.org:
-#    archive-url: 'https://slexy.org/recent'
-#    archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
-#    download-url: 'https://slexy.org/raw/{id}'
+  slexy.org:
+    archive-url: 'https://slexy.org/recent'
+    archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
+    download-url: 'https://slexy.org/view/{id}'
+    pastie-classname: PastieSlexyOrg
 
 #Site is no longer accepting new users or pastes
 # pastesite.com:
