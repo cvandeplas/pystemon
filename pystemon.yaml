@@ -42,6 +42,7 @@ email:
 search:
 #  - description: ''    # (optional) A human readable description. (used in alerting)
 #    search: ''         # The regular expression to search for
+#    item-list-file: '' # Alternatively, you can monitor a list of words (one per line) in this file
 #    count: ''          # (optional) How many hits should it have to be interesting?
 #    exclude: ''        # (optional) Do not alert if this regular expression matches
 #    regex-flags: ''    # (optional) Regular expression flags to give to the find function.
