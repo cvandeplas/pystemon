@@ -45,8 +45,13 @@ try:
     import yaml
 except:
     exit('ERROR: Cannot import the yaml Python library. Are you sure it is installed?')
+# If these optional modules are needed we will check later if they were imported
 try:
     import redis
+except:
+    pass
+try:
+    import sqlite3
 except:
     pass
 
@@ -536,9 +541,8 @@ def main():
     # start a thread to handle the DB data
     db = None
     if yamlconfig['db'] and yamlconfig['db']['sqlite3'] and yamlconfig['db']['sqlite3']['enable']:
-        try:
-            global sqlite3
-            import sqlite3
+        try: # Check if sqlite3 is defined. If not, the module is not loaded
+            sqlite3
         except:
             exit('ERROR: Cannot import the sqlite3 Python library. Are you sure it is compiled in python?')
         db = Sqlite3Database(yamlconfig['db']['sqlite3']['file'])
