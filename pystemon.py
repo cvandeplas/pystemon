@@ -45,6 +45,15 @@ try:
     import yaml
 except:
     exit('ERROR: Cannot import the yaml Python library. Are you sure it is installed?')
+# If these optional modules are needed we will check later if they were imported
+try:
+    import redis
+except:
+    pass
+try:
+    import sqlite3
+except:
+    pass
 
 try:
     if sys.version_info < (2, 7):
@@ -532,9 +541,8 @@ def main():
     # start a thread to handle the DB data
     db = None
     if yamlconfig['db'] and yamlconfig['db']['sqlite3'] and yamlconfig['db']['sqlite3']['enable']:
-        try:
-            global sqlite3
-            import sqlite3
+        try: # Check if sqlite3 is defined. If not, the module is not loaded
+            sqlite3
         except:
             exit('ERROR: Cannot import the sqlite3 Python library. Are you sure it is compiled in python?')
         db = Sqlite3Database(yamlconfig['db']['sqlite3']['file'])
@@ -924,8 +932,8 @@ def parse_config_file(configfile):
         except:
             exit('ERROR: Cannot import PyMongo. Are you sure it is installed ?')
     if yamlconfig['redis']['queue']:
-        try:
-            import redis
+        try: # Check if redis is defined. If not, the module is not loaded
+            redis
         except:
             exit('ERROR: Cannot import the redis Python library. Are you sure it is installed?')
 
