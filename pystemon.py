@@ -41,6 +41,7 @@ import threading
 import time
 import urllib
 import urllib2
+import httplib
 try:
     import yaml
 except:
@@ -221,6 +222,7 @@ def verify_directory_exists(directory):
 class Pastie():
     def __init__(self, site, pastie_id):
         self.site = site
+        self.notify_alert = False
         self.id = pastie_id
         self.pastie_content = None
         self.matches = []
@@ -296,6 +298,9 @@ class Pastie():
                 # ignore if exclude
                 if 'exclude' in regex and re.search(regex['exclude'], self.pastie_content, regex_flags):
                     continue
+                #Verify Notofication
+                if 'notify_alert' in regex:
+                    self.notify_alert = True
                 # we have a match, add to match list
                 self.matches.append(regex)
         if self.matches:
@@ -314,8 +319,11 @@ class Pastie():
         if yamlconfig['mongo']['save']:
             self.save_mongo()
         # Send email alert if configured
-        if yamlconfig['email']['alert']:
+        if yamlconfig['email']['alert'] and self.notify_alert:
             self.send_email_alert()
+        # Send pushover alert if configured
+        if yamlconfig['pushover']['alert'] and self.notify_alert:
+            self.send_pushover_alert()
 
     def matches_to_text(self):
         descriptions = []
@@ -337,6 +345,17 @@ class Pastie():
             return unicode(descriptions)
         else:
             return ''
+
+ #set FLAG for messages
+    def matches_to_regex_flag(self):
+        descriptions = []
+        for match in self.matches:
+            if 'flag' in match:
+                descriptions.append(match['flag'])
+        if descriptions :
+            return unicode(descriptions)
+        else:
+            return ''         
 
     def save_mongo(self):
         content = self.pastie_content.encode('utf8')
@@ -360,6 +379,7 @@ class Pastie():
         msg['To'] = ','.join(recipients)  # here the list needs to be comma separated
         # message body including full paste rather than attaching it
         message = '''
+{flag}       
 I found a hit for a regular expression on one of the pastebin sites.
 
 The site where the paste came from :        {site}
@@ -370,7 +390,7 @@ Below (after newline) is the content of the pastie:
 
 {content}
 
-        '''.format(site=self.site.name, url=self.public_url, matches=self.matches_to_regex(), content=self.pastie_content.encode('utf8'))
+        '''.format(site=self.site.name, url=self.public_url, matches=self.matches_to_regex(), flag=self.matches_to_regex_flag(), content=self.pastie_content.encode('utf8'))
         msg.attach(MIMEText(message))
         # send out the mail
         try:
@@ -388,6 +408,31 @@ Below (after newline) is the content of the pastie:
         except Exception as e:
             logger.error("ERROR: unable to send email. Are your email setting correct?: {e}".format(e=e))
 
+    def send_pushover_alert(self):
+        alert = "Found hit for {matches} in pastie {url}".format(matches=self.matches_to_text(), url=self.url)
+       # headers
+        tokenID = yamlconfig['pushover']['token']
+        userID = yamlconfig['pushover']['user']
+ 
+        message = '''
+{flag}
+I found a hit for a regular expression on one of the pastebin sites.
+ 
+The site where the paste came from :        {site}
+The original paste was located here:        {url}
+And the regular expressions that matched:   {matches}
+ 
+Below (after newline) is the content of the pastie:
+  
+{content}'''.format(site=self.site.name, url=self.url, matches=self.matches_to_regex(), flag=self.matches_to_regex_flag(), content=self.pastie_content.encode('utf8'))
+        conn = httplib.HTTPSConnection("api.pushover.net:443")
+        conn.request("POST", "/1/messages.json",
+          urllib.urlencode({
+            "token": tokenID,
+            "user": userID,
+            "message": message,
+          }), { "Content-type": "application/x-www-form-urlencoded" })
+        conn.getresponse()
 
 class PastiePasteSiteCom(Pastie):
     '''
