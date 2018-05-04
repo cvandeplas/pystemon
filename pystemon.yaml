@@ -94,7 +94,7 @@ site:
 
   # See https://pastebin.com/api_scraping_faq , you will need a pro account on pastebin
   pastebin.com_pro:
-    archive-url: 'hhttps://scrape.pastebin.com/api_scraping.php?limit=500'
+    archive-url: 'https://scrape.pastebin.com/api_scraping.php?limit=500'
     archive-regex: '"key": "(.+)",'
     download-url: 'https://scrape.pastebin.com/api_scrape_item.php?i={id}'
     public-url: 'https://pastebin.com/raw/{id}'
