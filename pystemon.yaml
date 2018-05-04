@@ -45,8 +45,7 @@ search:
 #  - description: ''    # (optional) A human readable description used in alerts.
 #                       #            If left unspecified the search regular expression
 #                       #            will be used as description.
-#    search: ''         # The regular expression to search for. Multiple regular expressions
-#                       #            can be used under a single description.
+#    search: ''         # The regular expression to search for.
 #    count: ''          # (optional) How many hits should it have to be interesting?
 #    exclude: ''        # (optional) Do not alert if this regular expression matches
 #    regex-flags: ''    # (optional) Regular expression flags to give to the find function.
