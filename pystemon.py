@@ -407,20 +407,21 @@ class PastiePasteSiteCom(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        validation_form_page, headers = download_url(self.url)
+        response = download_url(self.url)
+        validation_form_page = response.text
         if validation_form_page:
-            htmlDom = BeautifulSoup(validation_form_page)
+            htmlDom = BeautifulSoup(validation_form_page, 'lxml')
             if not htmlDom:
                 return self.pastie_content
             content_left = htmlDom.find(id='full-width')
             if not content_left:
                 return self.pastie_content
             plain_confirm = content_left.find('input')['value']
-            # build a form with plainConfirm = value and the cookie
+            # build a form with plainConfirm = value (the cookie remains in the requests session)
             data = urlencode({'plainConfirm': plain_confirm})
             url = "http://pastesite.com/plain/{id}".format(id=self.id)
-            cookie = headers.dict['set-cookie']
-            self.pastie_content, headers = download_url(url, data, cookie)
+            response2 = download_url(url, data)
+            self.pastie_content = response2
         return self.pastie_content
 
 
@@ -435,16 +436,18 @@ class PastieSlexyOrg(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        validation_form_page, headers = download_url(self.url)
+        response = download_url(self.url)
+        validation_form_page = response.text
         if validation_form_page:
-            htmlDom = BeautifulSoup(validation_form_page)
+            htmlDom = BeautifulSoup(validation_form_page, 'lxml')
             if not htmlDom:
                 return self.pastie_content
             a = htmlDom.find('a', {'target': '_blank'})
             if not a:
                 return self.pastie_content
             url = "https://slexy.org{}".format(a['href'])
-            self.pastie_content, headers = download_url(url)
+            response2 = download_url(url)
+            self.pastie_content = response2.text
         return self.pastie_content
 
 
@@ -459,7 +462,8 @@ class PastieCdvLt(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        downloaded_page, headers = download_url(self.url)
+        response = download_url(self.url)
+        downloaded_page = response.text
         if downloaded_page:
             # convert to json object
             json_pastie = json.loads(downloaded_page)
@@ -480,7 +484,8 @@ class PastieSniptNet(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        downloaded_page, headers = download_url(self.url)
+        response = download_url(self.url)
+        downloaded_page = response.text
         if downloaded_page:
             htmlDom = BeautifulSoup(downloaded_page)
             # search for <textarea class="raw">
@@ -618,7 +623,7 @@ def get_random_user_agent():
     global user_agents_list
     if user_agents_list:
         return random.choice(user_agents_list)
-    return None
+    return 'Python-urllib/2.7'
 
 
 proxies_failed = []
@@ -700,7 +705,7 @@ def download_url(url, data=None, cookie=None, loop_client=0, loop_server=0):
     if random_proxy:
         session.proxies = {'http': random_proxy}
     user_agent = get_random_user_agent()
-    session.headers.update({'User-Agent': get_random_user_agent(), 'Accept-Charset': 'utf-8'})
+    session.headers.update({'User-Agent': user_agent, 'Accept-Charset': 'utf-8'})
     if cookie:
         session.headers.update({'Cookie': cookie})
     if data:
@@ -779,6 +784,7 @@ def download_url(url, data=None, cookie=None, loop_client=0, loop_server=0):
         logger.warning("Failed to download the page because of other HTTPlib error proxy error {0} trying again.".format(url))
         loop_server += 1
         logger.warning("Retry {nb}/{total} for {url}".format(nb=loop_server, total=retries_server, url=url))
+        logger.error(traceback.format_exc())
         return download_url(url, loop_server=loop_server)
         # logger.error("ERROR: Other HTTPlib error: {e}".format(e=e))
         # return None, None
