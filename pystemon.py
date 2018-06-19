@@ -13,6 +13,7 @@ To be implemented:
 - TODO save files in separate directories depending on the day/week/month. Try to avoid duplicate files
 '''
 
+from bs4 import BeautifulSoup
 try:
     from queue import Queue
 except ImportError:
@@ -35,7 +36,7 @@ import optparse
 import os
 import random
 import re
-from sets import Set
+import json
 import smtplib
 import socket
 import sys
@@ -49,11 +50,10 @@ try:
     from urllib.error import HTTPError, URLError
 except ImportError:
     from urllib2 import HTTPError, URLError
-
 try:
-    import redis
+    from urllib.parse import urlencode
 except ImportError:
-    exit('ERROR: Cannot import the redis Python library. Are you sure it is installed?')
+    from urllib import urlencode
 
 try:
     import yaml
@@ -63,7 +63,7 @@ except ImportError:
 try:
     if sys.version_info < (2, 7):
         exit('You need python version 2.7 or newer.')
-except:
+except Exception:
     exit('You need python version 2.7 or newer.')
 
 retries_client = 5
@@ -100,7 +100,7 @@ class PastieSite(threading.Thread):
             self.ip_addr = yamlconfig['network']['ip']
             # true_socket = socket.socket
             socket.socket = make_bound_socket(self.ip_addr)
-        except:
+        except Exception:
             logger.debug("Using default IP address")
 
         self.save_dir = yamlconfig['archive']['dir'] + os.sep + name
@@ -332,7 +332,7 @@ class Pastie():
             else:
                 descriptions.append(match['search'])
         if descriptions:
-            return '[{}]'.format(', '.join(descriptions.decode('utf-8', 'ignore')))
+            return '[{}]'.format(', '.join([description for description in descriptions]))
         else:
             return ''
 
@@ -341,7 +341,7 @@ class Pastie():
         for match in self.matches:
             descriptions.append(match['search'])
         if descriptions:
-            return '[{}]'.format(', '.join(descriptions.decode('utf-8', 'ignore')))
+            return '[{}]'.format(', '.join([description for description in descriptions]))
         else:
             return ''
 
@@ -417,7 +417,7 @@ class PastiePasteSiteCom(Pastie):
                 return self.pastie_content
             plain_confirm = content_left.find('input')['value']
             # build a form with plainConfirm = value and the cookie
-            data = urllib.urlencode({'plainConfirm': plain_confirm})
+            data = urlencode({'plainConfirm': plain_confirm})
             url = "http://pastesite.com/plain/{id}".format(id=self.id)
             cookie = headers.dict['set-cookie']
             self.pastie_content, headers = download_url(url, data, cookie)
@@ -548,9 +548,10 @@ def main():
     # start a thread to handle the DB data
     db = None
     if yamlconfig['db'] and yamlconfig['db']['sqlite3'] and yamlconfig['db']['sqlite3']['enable']:
-        try: # Check if sqlite3 is defined. If not, the module is not loaded
-            sqlite3
-        except:
+        try:
+            global sqlite3
+            import sqlite3
+        except ImportError:
             exit('ERROR: Cannot import the sqlite3 Python library. Are you sure it is compiled in python?')
         db = Sqlite3Database(yamlconfig['db']['sqlite3']['file'])
         db.setDaemon(True)
@@ -622,7 +623,7 @@ def get_random_user_agent():
 
 proxies_failed = []
 proxies_lock = threading.Lock()
-proxies_list = Set([])
+proxies_list = []
 
 
 class ThreadProxyList(threading.Thread):
@@ -895,8 +896,13 @@ def parse_config_file(configfile):
         load_proxies_from_file(yamlconfig['proxy']['file'])
     if yamlconfig['user-agent']['random']:
         load_user_agents_from_file(yamlconfig['user-agent']['file'])
-    # if yamlconfig['redis']['queue']:
-    #    import redis
+    if yamlconfig['redis']['queue']:
+        try:
+            global redis
+            import redis
+        except ImportError:
+            exit('ERROR: Cannot import the redis Python library. Are you sure it is installed?')
+
     if yamlconfig['mongo']['save']:
         try:
             from pymongo import MongoClient
@@ -905,7 +911,7 @@ def parse_config_file(configfile):
             database = yamlconfig['mongo']['database']
             db = client[database]
 
-            mongoUsername  = yamlconfig['mongo']['user']
+            mongoUsername = yamlconfig['mongo']['user']
             mongoPassword = yamlconfig['mongo']['password']
             if mongoUsername and mongoPassword:
                 try:
@@ -915,8 +921,7 @@ def parse_config_file(configfile):
             collection = yamlconfig['mongo']['collection']
             global mongo_col
             mongo_col = db[collection]
-
-        except:
+        except ImportError:
             exit('ERROR: Cannot import PyMongo. Are you sure it is installed ?')
 
 
