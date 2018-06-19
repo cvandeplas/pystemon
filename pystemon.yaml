@@ -100,29 +100,11 @@ site:
     update-max: 50
     update-min: 40
 
-  pastie.org:
-    archive-url: 'http://pastie.org/pastes'
-    archive-regex: '<a href="http://pastie.org/pastes/(\d+)">'
-    download-url: 'http://pastie.org/pastes/{id}/text'
-
-# Site seems offline now
-#  nopaste.me:
-#    archive-url: 'http://nopaste.me/recent'
-#    archive-regex: '<a href="http://nopaste.me/paste/([a-zA-Z0-9]+)">'
-#    download-url: 'http://nopaste.me/download/{id}.txt'
-
   slexy.org:
     archive-url: 'https://slexy.org/recent'
     archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
     download-url: 'https://slexy.org/view/{id}'
     pastie-classname: PastieSlexyOrg
-
-#Site is no longer accepting new users or pastes
-# pastesite.com:
-#   pastie-classname: PastiePasteSiteCom
-#   archive-url: 'http://pastesite.com/recent'
-#   archive-regex: '<a href="(\d+)" title="View this Paste'
-#   download-url: 'http://pastesite.com/plain/{id}.txt'
 
   gist.github.com:
     archive-url: 'https://gist.github.com/discover'
@@ -139,11 +121,6 @@ site:
     archive-regex: '<a href="http://codepad.org/([a-zA-Z0-9]+)">view'
     download-url: 'http://codepad.org/{id}/raw.txt'
 
-  pastebin.ca:
-    archive-url: 'http://pastebin.ca'
-    archive-regex: 'rel="/preview.php\?id=(\d+)'
-    download-url: 'http://pastebin.ca/{id}'
-
   kpaste.net:
     archive-url: 'http://kpaste.net/'
     archive-regex: '" href="/(\w+)">'
@@ -154,25 +131,43 @@ site:
     archive-regex: '<a href="/([a-zA-Z0-9]+)">#'
     download-url: 'http://ideone.com/plain/{id}'
 
-
   pastebin.ru:
     archive-url: 'http://pastebin.ru/'
     archive-regex: '<a href="/(\w+)">'
     download-url: 'http://pastebin.ru/{id}'
-
 
   pastebin.fr:
     archive-url: 'http://pastebin.fr'
     archive-regex: '<a href="http://pastebin.fr/(\d+)'
     download-url: 'http://pastebin.fr/{id}'
 
+# Sites that are offline:
+  # pastesite.com:
+  #   pastie-classname: PastiePasteSiteCom
+  #   archive-url: 'http://pastesite.com/recent'
+  #   archive-regex: '<a href="(\d+)" title="View this Paste'
+  #   download-url: 'http://pastesite.com/plain/{id}.txt'
 
-# Site seems offline now
-#  cdv.lt:
-#    pastie-classname: PastieCdvLt
-#    archive-url: 'http://cdv.lt/snippets'
-#    archive-regex: '<a href="/([a-zA-Z0-9]+)">[0-9]'
-#    download-url: 'http://cdv.lt/api/snippet/{id}'
+  # pastie.org:
+  #   archive-url: 'http://pastie.org/pastes'
+  #   archive-regex: '<a href="http://pastie.org/pastes/(\d+)">'
+  #   download-url: 'http://pastie.org/pastes/{id}/text'
+
+  # pastebin.ca:
+  #   archive-url: 'http://pastebin.ca'
+  #   archive-regex: 'rel="/preview.php\?id=(\d+)'
+  #   download-url: 'http://pastebin.ca/{id}'
+
+  # nopaste.me:
+  #  archive-url: 'http://nopaste.me/recent'
+  #  archive-regex: '<a href="http://nopaste.me/paste/([a-zA-Z0-9]+)">'
+  #  download-url: 'http://nopaste.me/download/{id}.txt'
+
+  # cdv.lt:
+  #  pastie-classname: PastieCdvLt
+  #  archive-url: 'http://cdv.lt/snippets'
+  #  archive-regex: '<a href="/([a-zA-Z0-9]+)">[0-9]'
+  #  download-url: 'http://cdv.lt/api/snippet/{id}'
 
   # snipt.net:
   #   pastie-classname: PastieSniptNet
