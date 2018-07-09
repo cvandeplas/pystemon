@@ -447,7 +447,7 @@ class PastieSlexyOrg(Pastie):
                 return self.pastie_content
             url = "https://slexy.org{}".format(a['href'])
             response2 = download_url(url)
-            self.pastie_content = response2.text
+            self.pastie_content = response2.content
         return self.pastie_content
 
 
