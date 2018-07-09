@@ -346,7 +346,7 @@ class Pastie():
             return ''
 
     def save_mongo(self):
-        content = self.pastie_content.encode('utf8')
+        content = self.pastie_content
         hash = hashlib.md5()
         hash.update(content)
 
