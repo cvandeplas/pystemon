@@ -23,6 +23,12 @@ mongo:
   url: "mongodb://localhost"
   user:
   password:
+  save_on_miss: yes     # always save meta-data (hash), even on miss match
+  meta:                 # extra meta-data
+    save: yes           # enable adding extra meta-data when saving (on hit or miss)
+    timestamp: yes      # add a timestamp (UTC)
+    url: yes            # add the public URL
+    site: yes           # add the site
 
 redis:
   queue: no
