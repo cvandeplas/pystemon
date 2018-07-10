@@ -8,6 +8,9 @@ archive:
   dir-all: "archive"    # Directory where all pasties should be kept (if save-all is set to yes)
   compress: yes         # Store the pasties compressed
 
+engine: re              # Only re (default) or regex (pip install regex) are supported.
+strict_regex: no        # when compiling regex, hard fail or not on error
+
 db:
   sqlite3:              # Store information about the pastie in a database
     enable: no          # Activate this DB engine   # NOT FULLY IMPLEMENTED

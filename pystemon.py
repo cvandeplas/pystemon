@@ -35,7 +35,6 @@ import logging.handlers
 import optparse
 import os
 import random
-import re
 import json
 import smtplib
 import socket
@@ -289,20 +288,8 @@ class Pastie():
             raise SystemExit('BUG: Content not set, cannot search')
             return False
         # search for the regexes in the htmlPage
-        for regex in yamlconfig['search']:
-            # LATER first compile regex, then search using compiled version
-            regex_flags = re.IGNORECASE
-            if 'regex-flags' in regex:
-                regex_flags = eval(regex['regex-flags'])
-            m = re.findall(regex['search'].encode(), self.pastie_content, regex_flags)
-            if m:
-                # the regex matches the text
-                # ignore if not enough counts
-                if 'count' in regex and len(m) < int(regex['count']):
-                    continue
-                # ignore if exclude
-                if 'exclude' in regex and re.search(regex['exclude'].encode(), self.pastie_content, regex_flags):
-                    continue
+        for regex in patterns:
+            if regex.match(self.pastie_content):
                 # we have a match, add to match list
                 self.matches.append(regex)
         if self.matches:
@@ -327,10 +314,7 @@ class Pastie():
     def matches_to_text(self):
         descriptions = []
         for match in self.matches:
-            if 'description' in match:
-                descriptions.append(match['description'])
-            else:
-                descriptions.append(match['search'])
+            descriptions.append(match.to_text())
         if descriptions:
             return '[{}]'.format(', '.join([description for description in descriptions]))
         else:
@@ -339,18 +323,24 @@ class Pastie():
     def matches_to_regex(self):
         descriptions = []
         for match in self.matches:
-            descriptions.append(match['search'])
+            descriptions.append(match.to_regex())
         if descriptions:
             return '[{}]'.format(', '.join([description for description in descriptions]))
         else:
             return ''
+
+    def matches_to_dict(self):
+        res = []
+        for match in self.matches:
+            res.append(match.to_dict())
+        return res
 
     def save_mongo(self):
         content = self.pastie_content
         hash = hashlib.md5()
         hash.update(content)
 
-        mongo_col.insert({"hash": hash.hexdigest(), "matches": self.matches, "content": content})
+        mongo_col.insert({"hash": hash.hexdigest(), "matches": self.matches_to_dict(), "content": content})
 
     def send_email_alert(self):
         msg = MIMEMultipart()
@@ -362,8 +352,8 @@ class Pastie():
         recipients = []
         recipients.append(yamlconfig['email']['to'])  # first the global alert email
         for match in self.matches:                    # per match, the custom additional email
-            if 'to' in match and match['to']:
-                recipients.extend(match['to'].split(","))
+            if match.to is not None:
+                recipients.extend(match.ato)
         msg['To'] = ','.join(recipients)  # here the list needs to be comma separated
         # message body including full paste rather than attaching it
         message = '''
@@ -535,13 +525,131 @@ class ThreadPasties(threading.Thread):
                 logger.error(msg)
                 logger.debug(traceback.format_exc())
 
+class PastieSearch():
+    def __init__(self, regex):
+        # set the re.FLAGS
+        if 'regex-flags' in regex:
+            self.regex_flags = regex['regex-flags']
+            self.flags = eval(self.regex_flags)
+        else:
+            self.regex_flags = None
+            self.flags = re.IGNORECASE
+        # compile the search regex
+        self.search = regex['search']
+        try:
+            self.re_search = re.compile(self.search.encode(), self.flags)
+        except Exception as e:
+            raise ValueError("invalid search regex: %s" % e)
+        # compile the exclude regex
+        self.exclude = regex.get('exclude', None)
+        if self.exclude is not None:
+            try:
+                self.re_exclude = re.compile(self.exclude.encode(), self.flags)
+            except Exception as e:
+                raise ValueError("invalid exclude regex: %s" % e)
+        # get the description
+        self.description = regex.get('description', None)
+        # get the count and convert it to integer
+        if 'count' in regex:
+            self.count = int(regex['count'])
+        else:
+            self.count = -1
+        # get the optional to and split it
+        self.to = regex.get('to', None)
+        if self.to is not None:
+            self.ato = self.to.split(",")
+        else:
+            self.ato = []
+        # add any extra things stored in yaml
+        self.extra={}
+        for (k, v) in regex.items():
+          if k in ['search', 'description', 'exclude', 'count', 'regex-flags', 'to']:
+              continue
+          self.extra[k]=v
+        self.h = None
+
+    def match(self, string):
+        m = self.re_search.findall(string)
+        if not m:
+            return False
+        # the regex matches the text
+        # ignore if not enough counts
+        if (self.count > 0) and (len(m) < self.count):
+            return False
+        # ignore if exclude
+        if self.exclude is not None:
+            if self.re_exclude.search(string):
+                return False
+        # we have a match
+        return True
+
+    def to_text(self):
+        if self.description is None:
+            return self.search
+        return self.description
+
+    def to_regex(self):
+        return self.search
+
+    def to_dict(self):
+        if self.h is None:
+            self.h = {'search':self.search}
+            if self.description is not None:
+                self.h['description'] = self.description
+            if self.exclude is not None:
+                self.h['exclude'] = self.exclude
+            if self.count >= 0:
+                self.h['count'] = self.count
+            if self.to is not None:
+                self.h['to'] = self.to
+            if self.regex_flags is not None:
+                self.h['regex-flags'] = self.regex_flags
+            for (k,v) in self.extra.items():
+                self.h[k] = v
+        return self.h
 
 def main():
     global queues
     global threads
     global db
+    global patterns
     queues = {}
     threads = []
+    patterns = []
+
+    # load the regular expression engine
+    engine = yamlconfig.get('engine', 're')
+    if engine == 're':
+        import re
+    elif engine == 'regex':
+        try:
+            global re
+            logger.debug("Loading alternative 'regex' engine ...")
+            import regex as re
+            re.DEFAULT_VERSION = re.VERSION1
+            logger.debug("Successfully loaded 'regex' engine")
+        except ImportError as e:
+            exit("ERROR: Unable to import 'regex' engine: %s" % e)
+    else:
+        exit("ERROR: Invalid regex engine '%s' specified" % engine)
+
+    # compile all search patterns
+    strict = yamlconfig.get('strict_regex', False)
+    for regex in yamlconfig['search']:
+        try:
+            search = regex['search']
+            ps = PastieSearch(regex)
+            patterns.append(ps)
+        except KeyError:
+            if strict:
+               exit("Error: Missing search pattern")
+            else:
+               logger.error("Error: skipping empty search pattern entry")
+        except Exception as e:
+            if strict:
+               exit("Error: Unable to parse regex '%s': %s" % (search, e))
+            else:
+               logger.error("Error: Unable to parse regex '%s': %s" % (search, e))
 
     # start thread for proxy file listener
     if yamlconfig['proxy']['random']:
