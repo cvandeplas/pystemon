@@ -294,6 +294,8 @@ class Pastie():
                 self.matches.append(regex)
         if self.matches:
             self.action_on_match()
+        else:
+            self.action_on_miss()
 
     def action_on_match(self):
         msg = 'Found hit for {matches} in pastie {url}'.format(
@@ -310,6 +312,10 @@ class Pastie():
         # Send email alert if configured
         if yamlconfig['email']['alert']:
             self.send_email_alert()
+
+    def action_on_miss(self):
+        if yamlconfig['mongo']['save'] and yamlconfig['mongo'].get('save_on_miss', False):
+            self.save_mongo()
 
     def matches_to_text(self):
         descriptions = []
@@ -339,8 +345,18 @@ class Pastie():
         content = self.pastie_content
         hash = hashlib.md5()
         hash.update(content)
-
-        mongo_col.insert({"hash": hash.hexdigest(), "matches": self.matches_to_dict(), "content": content})
+        data = {"hash": hash.hexdigest()}
+        if self.matches:
+            data['matches'] = self.matches_to_dict()
+            data['content'] = content
+        if mongo_save_meta['save']:
+            if mongo_save_meta.get('timestamp',False):
+                data['timestamp'] = datetime.utcnow()
+            if mongo_save_meta.get('url',False):
+                data['url'] = self.public_url
+            if mongo_save_meta.get('site',False):
+                data['site'] = self.site.name
+        mongo_col.insert(data)
 
     def send_email_alert(self):
         msg = MIMEMultipart()
@@ -1038,6 +1054,16 @@ def parse_config_file(configfile):
             mongo_col = db[collection]
             # Check the connection to MongoDB
             client.server_info()
+            global mongo_save_meta
+            mongo_save_meta = {}
+            h = yamlconfig['mongo'].get('meta', {})
+            for k in ['save','site','url', 'timestamp']:
+                try:
+                    mongo_save_meta[k] = h[k]
+                except KeyError:
+                    continue
+            if not 'save' in mongo_save_meta:
+                mongo_save_meta['save'] = False
         except ImportError:
             exit('ERROR: Cannot import PyMongo. Are you sure it is installed ?')
         except PyMongoError as p:
