@@ -1020,6 +1020,7 @@ def parse_config_file(configfile):
     if yamlconfig['mongo']['save']:
         try:
             from pymongo import MongoClient
+            from pymongo.errors import PyMongoError
             client = MongoClient(yamlconfig['mongo']['url'])
 
             database = yamlconfig['mongo']['database']
@@ -1035,8 +1036,14 @@ def parse_config_file(configfile):
             collection = yamlconfig['mongo']['collection']
             global mongo_col
             mongo_col = db[collection]
+            # Check the connection to MongoDB
+            client.server_info()
         except ImportError:
             exit('ERROR: Cannot import PyMongo. Are you sure it is installed ?')
+        except PyMongoError as p:
+            exit('ERROR: Unable to contact db: %s' % p)
+        except Exception as e:
+            exit('ERROR: Unable to parse configuration: %s' % e)
 
 
 def main_as_daemon():

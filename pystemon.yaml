@@ -114,11 +114,6 @@ site:
     archive-regex: '<a href="/([A-Za-z0-9]+/[A-Za-z0-9]+)">'
     download-url: 'https://gist.githubusercontent.com/{id}/raw/'
 
-  quickleak.se:
-    archive-url: 'http://www.quickleak.se/last-pastes.html'
-    archive-regex: '<td><a href="([A-Za-z0-9]+)">'
-    download-url: 'http://www.quickleak.se/{id}'
-
   codepad.org:
     archive-url: 'http://codepad.org/recent'
     archive-regex: '<a href="http://codepad.org/([a-zA-Z0-9]+)">view'
@@ -177,6 +172,11 @@ site:
   #   archive-url: 'https://snipt.net/public/?rss'
   #   archive-regex: '<link>https://snipt.net/(.+)/</link>'
   #   download-url: 'https://snipt.net/{id}/'
+
+  # quickleak.se:
+  #   archive-url: 'http://www.quickleak.se/last-pastes.html'
+  #   archive-regex: '<td><a href="([A-Za-z0-9]+)">'
+  #   download-url: 'http://www.quickleak.se/{id}'
 
 #  safebin.net:  # FIXME not finished
 #    archive-url: 'http://safebin.net/?archive'
