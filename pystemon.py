@@ -112,7 +112,34 @@ class PastieSite(threading.Thread):
         self.update_max = 30  # TODO set by config file
         self.update_min = 10  # TODO set by config file
         self.pastie_classname = None
-        self.seen_pasties = deque('', 1000)  # max number of pasties ids in memory
+        self.seen_pasties = deque('', 1000) # max number of seen pasties ids in memory
+        self.last_queued_pastie_id = None   # save the last pastie id queued for later
+        if 'prune' in yamlconfig and yamlconfig['prune']:
+            self.prune = True
+        else:
+            self.prune = False
+
+    def prune_pasties(self, pasties_ids):
+        try:
+            last_pastie_queued_index = pasties_ids.index(self.last_queued_pastie_id)
+        except ValueError:
+             last_pastie_queued_index = 0
+        if last_pastie_queued_index > 0:
+            # the last queued one is in the list to download
+            msg = 'Last queued pastie id for {name}: {id}'.format(
+                name=self.name, id=self.last_queued_pastie_id
+            )
+            logger.debug(msg)
+            msg = 'Pastie {id} found in new list of pasties at index={index}'.format(
+                id=self.last_queued_pastie_id, index=last_pastie_queued_index
+            )
+            logger.debug(msg)
+            old = len(pasties_ids)
+            # prune the list to keep only the ones more recent than the last one queued
+            del pasties_ids[:last_pastie_queued_index]
+            pruned = len(pasties_ids)
+            logger.debug("Pruned {n} pastie(s) already queued".format(n=old-pruned))
+        return pasties_ids
 
     def run(self):
         logger.info('Thread for Pastiesite {} started'.format(self.name))
@@ -129,7 +156,8 @@ class PastieSite(threading.Thread):
                 last_pasties = self.get_last_pasties()
                 if last_pasties:
                     for pastie in reversed(last_pasties):
-                        queues[self.name].put(pastie)  # add pastie to queue
+                        queues[self.name].put(pastie)                  # add pastie to queue
+                    self.last_queued_pastie_id = last_pasties[-1].id   # update queued info
                     logger.info("Found {amount} new pasties for site {site}. There are now {qsize} pasties to be downloaded.".format(amount=len(last_pasties),
                                                                                                                                      site=self.name,
                                                                                                                                      qsize=queues[self.name].qsize()))
@@ -152,6 +180,9 @@ class PastieSite(threading.Thread):
             return False
         pasties_ids = re.findall(self.archive_regex, htmlPage)
         if pasties_ids:
+            # seen pasties are those already downloaded
+            if self.prune and self.last_queued_pastie_id is not None:
+               pasties_ids = self.prune_pasties(pasties_ids)
             for pastie_id in pasties_ids:
                 # check if the pastie was already downloaded
                 # and remember that we've seen it
@@ -693,6 +724,11 @@ def main():
             t.update_max = yamlconfig['site'][site_name]['update-max']
         if 'pastie-classname' in yamlconfig['site'][site_name] and yamlconfig['site'][site_name]['pastie-classname']:
             t.pastie_classname = yamlconfig['site'][site_name]['pastie-classname']
+        if 'prune' in yamlconfig['site'][site_name]:
+            if yamlconfig['site'][site_name]['prune']:
+                t.prune = True
+            else:
+                t.prune = False
         threads.append(t)
         t.setDaemon(True)
         t.start()
