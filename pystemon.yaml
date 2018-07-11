@@ -11,6 +11,12 @@ archive:
 engine: re              # Only re (default) or regex (pip install regex) are supported.
 strict_regex: no        # when compiling regex, hard fail or not on error
 
+prune: no               # when fetching the list of pasties to download, prune all pasties
+#                       # present up to the last one queued on the last iteration
+#                       # you get more accurate count of pasties to be downloaed
+#                       # but if the list is not properly sorted, you might miss pasties
+#                       # The global switch can be set per site as well
+
 db:
   sqlite3:              # Store information about the pastie in a database
     enable: no          # Activate this DB engine   # NOT FULLY IMPLEMENTED
@@ -86,6 +92,7 @@ site:
 #    update-min: 30     # a random number will be chosen between these two numbers
 #    pastie-classname:  # OPTIONAL: The name of a custom Class that inherits from Pastie
 #                       # This is practical for sites that require custom fetchPastie() functions
+#    prune: false       # see the global switch for explanations
 
   pastebin.com:
     archive-url: 'https://pastebin.com/archive'
