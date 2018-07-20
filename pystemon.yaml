@@ -11,13 +11,26 @@ archive:
 engine: re              # Only re (default) or regex (pip install regex) are supported.
 strict_regex: no        # when compiling regex, hard fail or not on error
 
+save-thread: no         # Use a separate thread to save pasties
+
 db:
   sqlite3:              # Store information about the pastie in a database
     enable: no          # Activate this DB engine   # NOT FULLY IMPLEMENTED
     file: 'db.sqlite3'  # The filename of the database
+    lookup: no          # lookup sqlite for already seen pasties
 
 mongo:
-  save: no
+  save: no              # Keep a copy of pasties that triggered alerts
+  save-all: no          # Keep a copy of all pasties
+  save-profile:         # configure which data to save
+    content-on-miss: no # save the content even on miss
+    timestamp: no       # add the timestamp (UTC)
+    url: no             # add the public URL
+    site: no            # add the site
+    id: no              # add the per-site id
+    matched: no         # add the matched status (usefull if content-on-miss = yes)
+    filename: no        # add the local filename (to no store content in mongodb)
+  lookup: no            # lookup mongodb for already seen pasties
   database: "paste"
   collection: "paste"
   url: "mongodb://localhost"
@@ -25,10 +38,12 @@ mongo:
   password:
 
 redis:
-  queue: no
+  queue: no             # Keep a copy of pasties that triggered alerts
+  queue-all: no         # Keep a copy of all pasties
   server: "localhost"
   port: 6379
   database: 10
+  lookup: no            # lookup redisdb for already seen pasties (NOT IMPLEMENTED)
 
 email:
   alert: no             # Enable/disable email alerts
@@ -36,7 +51,7 @@ email:
   to: alert@example.com
   server: 127.0.0.1     # Address of the server (hostname or IP)
   port: 25              # Outgoing SMTP port: 25, 587, ...
-  tls: no             # Enable/disable tls support
+  tls: no               # Enable/disable tls support
   username: ''          # (optional) Username for authentication. Leave blank for no authentication.
   password: ''          # (optional) Password for authentication. Leave blank for no authentication.
   subject: '[pystemon] - {subject}'
