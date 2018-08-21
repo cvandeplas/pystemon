@@ -1117,12 +1117,12 @@ class FileStorage(PastieStorage):
     def __save_pastie__(self, pastie):
         directories = []
         res = []
+	full_path = None
         directories.append(self.archive_dir)
         if pastie.matched:
             directories.append(self.save_dir)
         for directory in directories:
             if directory is None:
-		full_path = None
                 continue
             directory = directory + os.sep + pastie.site.name
             full_path = self.format_directory(directory) + os.sep + pastie.filename
