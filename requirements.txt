@@ -1,2 +1,3 @@
 PyYAML
 BeautifulSoup4
+requests
