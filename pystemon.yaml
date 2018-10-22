@@ -147,11 +147,6 @@ site:
     archive-regex: '<a href="/([a-zA-Z0-9]+)">#'
     download-url: 'https://ideone.com/plain/{id}'
 
-  pastebin.ru:
-    archive-url: 'http://pastebin.ru/'
-    archive-regex: '<a href="/(\w+)">'
-    download-url: 'http://pastebin.ru/{id}'
-
   pastebin.fr:
     archive-url: 'http://pastebin.fr'
     archive-regex: '<a href="http://pastebin.fr/(\d+)'
