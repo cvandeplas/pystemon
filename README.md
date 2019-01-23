@@ -23,14 +23,9 @@ Features:
 
 Python Dependencies
 -------------------
-* PyYAML
-* BeautifulSoup
+Python dependencies can be installed with: `pip3 -r requirements.txt`
 * PyMongo (For Optional Mongodb support)
 
-Limitations:
-------------
-* Only HTTP proxies are allowed
-* Only HTTP urls will use proxies
 
 Usage
 ------
