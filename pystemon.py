@@ -466,6 +466,28 @@ Below (after newline) is the content of the pastie:
             logger.error("ERROR: unable to send email. Are your email setting correct?: {e}".format(e=e))
 
 
+class PastieBerylia(Pastie):
+    '''
+    Custom Pastie class for the berylia.org site, related to the LockedShields cyber exercise
+    This class overloads the fetch_pastie function to do the form
+    submit to get the raw pastie
+    '''
+
+    def __init__(self, site, pastie_id):
+        Pastie.__init__(self, site, pastie_id)
+
+    def fetch_pastie(self):
+        response = download_url(self.url)
+        downloaded_page = response.text
+        if downloaded_page:
+            # convert to json object
+            json_pastie = json.loads(downloaded_page)
+            if json_pastie:
+                # and extract the code
+                self.pastie_content = json_pastie['paste']
+        return self.pastie_content
+
+
 class PastiePasteSiteCom(Pastie):
     '''
     Custom Pastie class for the pastesite.com site

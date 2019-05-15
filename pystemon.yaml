@@ -152,6 +152,15 @@ site:
     archive-regex: '<a href="http://pastebin.fr/(\d+)'
     download-url: 'http://pastebin.fr/{id}'
 
+# Exercise related sites
+# this is site related to the LockedShields cyber exercise.
+  # pastebin.berylia.org:
+  #   archive-url: 'https://pastebin.berylia.org/api/recent'
+  #   archive-regex: '"pid":"([a-zA-Z0-9]+)",'
+  #   download-url: 'https://pastebin.berylia.org/api/paste/{id}'
+  #   pastie-classname: PastieBerylia
+
+
 # Sites that are offline:
   # pastesite.com:
   #   pastie-classname: PastiePasteSiteCom
