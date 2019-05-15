@@ -1556,7 +1556,7 @@ def main_as_daemon(storage_engines):
 
         if pid > 0:
             pid_file = open('pid', 'w')
-            pid_file.write(str(pid))
+            pid_file.write(unicode(pid))
             pid_file.close()
             print('pystemon started as daemon')
             print('PID: %d' % pid)
