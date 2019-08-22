@@ -65,7 +65,6 @@ search:
 #                       #            will be used as description.
 #    search: ''         # The regular expression to search for. Multiple regular expressions
 #                       #            can be used under a single description.
-#    item-list-file: '' # Alternatively, you can monitor a list of words (one per line) in this file
 #    count: ''          # (optional) How many hits should it have to be interesting?
 #    exclude: ''        # (optional) Do not alert if this regular expression matches
 #    regex-flags: ''    # (optional) Regular expression flags to give to the find function.

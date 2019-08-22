@@ -60,11 +60,6 @@ except ImportError:
     from urllib import urlencode
 
 try:
-    import redis
-except ImportError:
-    exit('ERROR: Cannot import the redis Python library. Are you sure it is installed?')
-
-try:
     import yaml
 except ImportError:
     exit('ERROR: Cannot import the yaml Python library. Are you sure it is installed?')
@@ -319,52 +314,10 @@ class Pastie():
     def search_content(self):
         if not self.pastie_content:
             raise SystemExit('BUG: Content not set, cannot search')
-            return False
-
-        # loop through "item-list-file" : these files contains list of words
-        for item in yamlconfig['search']:
-            tmplist = []
-            if not 'item-list-file' in item:
-                continue
-            with open(item['item-list-file'], 'r') as f:
-                for s in f:
-                    s = s.encode().strip()
-                    if s.lower() in self.pastie_content.lower():
-                        tmplist.append(s)
-
-            # ignore if not enough counts
-            if 'count' in item and len(tmplist) < int(item['count']):
-                continue
-            # ignore if exclude
-            if 'exclude' in item and re.search(item['exclude'].encode(), self.pastie_content, re.IGNORECASE):
-                continue
-            # report results
-            tmp = {}
-            if len(tmplist) > 1:
-                tmp['search'] = ', '.join(tmplist)
-            else:
-                tmp['search'] = ''.join(tmplist)
-            tmp['description'] = item['description']
-            self.matches.append(tmp)
-
+        logger.debug('Looking for matches in pastie {url}'.format(url=self.public_url))
         # search for the regexes in the htmlPage
-        for regex in yamlconfig['search']:
-            if 'item-list-file' in item:
-                continue
-            # LATER first compile regex, then search using compiled version
-            regex_flags = re.IGNORECASE
-            if 'regex-flags' in regex:
-                regex_flags = eval(regex['regex-flags'])
-            m = re.findall(regex['search'], self.pastie_content, regex_flags)
-            if m:
-                # the regex matches the text
-                # ignore if not enough counts
-                if 'count' in regex and len(m) < int(regex['count']):
-                    continue
-                # ignore if exclude
-                if 'exclude' in regex and re.search(regex['exclude'], self.pastie_content, regex_flags):
-                    continue
-
+        for regex in patterns:
+            if regex.match(self.pastie_content):
                 # we have a match, add to match list
                 self.matches.append(regex)
                 self.matched = True
@@ -1556,7 +1509,7 @@ def main_as_daemon(storage_engines):
 
         if pid > 0:
             pid_file = open('pid', 'w')
-            pid_file.write(unicode(pid))
+            pid_file.write(unicode(str(pid)))
             pid_file.close()
             print('pystemon started as daemon')
             print('PID: %d' % pid)
