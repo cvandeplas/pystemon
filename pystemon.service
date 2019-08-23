@@ -1,5 +1,6 @@
 # Example startup unit for Pystemon.
 # Adapt for your installation.
+# Copy this file to /etc/systemd/system
 # Note that syslog configuration may be modified so all pystemon logs don't go in syslog. 
 [Unit]
 Description=System-wide instance of Pystemon
