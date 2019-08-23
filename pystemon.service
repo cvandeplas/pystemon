@@ -1,0 +1,16 @@
+# Example startup unit for Pystemon.
+# Adapt for your installation.
+# Note that syslog configuration may be modified so all pystemon logs don't go in syslog. 
+[Unit]
+Description=System-wide instance of Pystemon
+After=network.target
+
+[Service]
+User=pystemon
+Group=pystemon
+WorkingDirectory=/home/pystemon/pystemon/
+ExecStart=/home/pystemon/pystemon/pystemon.py -d
+Type=forking
+Restart=always
+[Install]
+WantedBy=multi-user.target
