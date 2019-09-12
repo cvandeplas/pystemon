@@ -95,7 +95,7 @@ class PastieSite(threading.Thread):
         self.kill_received = False
         self.name = name
         self.download_url = download_url
-        self.public_url = download_url
+        self.public_url = download_url        
         self.archive_url = archive_url
         self.archive_regex = archive_regex
         try:
@@ -114,6 +114,8 @@ class PastieSite(threading.Thread):
             if not os.path.exists(self.archive_dir):
                 os.makedirs(self.archive_dir)
         except KeyError: pass
+        if kwargs['site_public_url'] is not None:
+            self.public_url = kwargs['site_public_url']
         self.archive_compress = kwargs.get('archive_compress', False)
         self.update_min = kwargs['site_update_min']
         self.update_max = kwargs['site_update_max']
@@ -400,8 +402,8 @@ Below (after newline) is the content of the pastie:
 
 {content}
 
-        '''.format(site=self.site.name, url=self.public_url, matches=self.matches_to_regex(), content=self.pastie_content)
-        msg.attach(MIMEText(message, 'plain', 'UTF-8'))
+        '''.format(site=self.site.name, url=self.public_url, matches=self.matches_to_regex(), content=self.pastie_content.decode('utf8'))
+        msg.attach(MIMEText(message))
         # send out the mail
         try:
             s = smtplib.SMTP(yamlconfig['email']['server'], yamlconfig['email']['port'])
