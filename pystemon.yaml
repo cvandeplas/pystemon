@@ -116,6 +116,7 @@ site:
     archive-regex: '"key": "(.+)",'
     download-url: 'https://scrape.pastebin.com/api_scrape_item.php?i={id}'
     public-url: 'https://pastebin.com/raw/{id}'
+    metadata-url: 'https://scrape.pastebin.com/api_scrape_item_meta.php?i={id}'
     update-max: 50
     update-min: 40
 

@@ -98,6 +98,7 @@ class PastieSite(threading.Thread):
         self.public_url = download_url        
         self.archive_url = archive_url
         self.archive_regex = archive_regex
+        self.metadata_url = None
         try:
             self.ip_addr = yamlconfig['network']['ip']
             # true_socket = socket.socket
@@ -116,6 +117,8 @@ class PastieSite(threading.Thread):
         except KeyError: pass
         if kwargs['site_public_url'] is not None:
             self.public_url = kwargs['site_public_url']
+        if kwargs['site_metadata_url'] is not None:
+            self.metadata_url = kwargs['site_metadata_url']
         self.archive_compress = kwargs.get('archive_compress', False)
         self.update_min = kwargs['site_update_min']
         self.update_max = kwargs['site_update_max']
@@ -240,11 +243,15 @@ class Pastie():
         self.site = site
         self.id = pastie_id
         self.pastie_content = None
+        self.pastie_metadata = None
         self.matches = []
         self.matched = False
         self.md5 = None
         self.url = self.site.download_url.format(id=self.id)
         self.public_url = self.site.public_url.format(id=self.id)
+        self.metadata_url = None        
+        if self.site.metadata_url is not None:
+            self.metadata_url = self.site.metadata_url.format(id=self.id)
         self.filename = self.site.pastie_id_to_filename(self.id)
 
     def hash_pastie(self):
@@ -256,6 +263,11 @@ class Pastie():
                 logger.error('Pastie {site} {id} md5 problem: {e}'.format(site=self.site.name, id=self.id, e=e))
 
     def fetch_pastie(self):
+        if self.metadata_url is not None:
+            response = download_url(self.metadata_url)
+            if response is not None:
+                response = response.content
+                self.pastie_metadata = response
         response = download_url(self.url)
         if response is not None:
             response = response.content
@@ -750,6 +762,7 @@ def main(storage_engines):
             site_archive_regex = site_config['archive-regex']
             t = PastieSite(site_name, site_download_url, site_archive_url, site_archive_regex,
                     site_public_url = site_config.get('public-url'),
+                    site_metadata_url = site_config.get('metadata-url'),
                     site_update_min = site_config.get('update-min', 10),
                     site_update_max = site_config.get('update-max', 30),
                     site_pastie_classname = site_config.get('pastie-classname'),
@@ -1157,6 +1170,12 @@ class FileStorage(PastieStorage):
                 f = open(full_path, 'wb')
             f.write(pastie.pastie_content)
             f.close()
+            # Writing pastie metadata in a separate file if they exist
+            if pastie.pastie_metadata:
+                logger.debug('Site[{site}]: Writing pastie[{id}][{disk}] metadata to disk.'.format(site=pastie.site.name, id=pastie.id, disk=full_path))                
+                f = open(full_path + ".metadata", 'wb')
+                f.write(pastie.pastie_metadata)
+                f.close()            
             logger.debug('Site[{site}]: Wrote pastie[{id}][{disk}] to disk.'.format(site=pastie.site.name, id=pastie.id, disk=full_path))
         return full_path
 
