@@ -1363,7 +1363,7 @@ class Sqlite3Storage(PastieStorage):
                     'timestamp': datetime.now(),
                     'matches': pastie.matches_to_text()
                     }
-            self.__conect__().execute('''UPDATE pasties SET md5 = :md5,
+            self.__connect__().execute('''UPDATE pasties SET md5 = :md5,
                                             url = :url,
                                             local_path = :local_path,
                                             timestamp  = :timestamp,
