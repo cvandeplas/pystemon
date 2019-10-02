@@ -55,6 +55,7 @@ email:
   username: ''          # (optional) Username for authentication. Leave blank for no authentication.
   password: ''          # (optional) Password for authentication. Leave blank for no authentication.
   subject: '[pystemon] - {subject}'
+  size-limit: 1048576   # Size limit for pastie, above it's sent as attachement
 
 #####
 # Definition of regular expressions to search for in the pasties

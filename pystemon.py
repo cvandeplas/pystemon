@@ -26,13 +26,14 @@ from collections import deque
 from datetime import datetime
 try:
     from email.mime.multipart import MIMEMultipart
+    from email.mime.base import MIMEBase
+    from email.mime.text import MIMEText
+    from email import encoders as Encoders
 except ImportError:
     from email.MIMEMultipart import MIMEMultipart
-
-try:
-    from email.mime.text import MIMEText
-except ImportError:
+    from email.MIMEBase import MIMEBase
     from email.MIMEText import MIMEText
+    from email import Encoders
 import gzip
 import hashlib
 import logging.handlers
@@ -388,7 +389,16 @@ class Pastie():
             if match.to is not None:
                 recipients.extend(match.ato)
         msg['To'] = ','.join(recipients)  # here the list needs to be comma separated
-        # message body including full paste rather than attaching it
+        if len(self.pastie_content) > yamlconfig['email']['size-limit']:
+            part = MIMEBase('application', "text/plain")
+            part.set_payload(self.pastie_content.decode('utf8'))
+            Encoders.encode_base64(part)
+            part.add_header('Content-Disposition', 'attachment; filename="{id}.txt"'.format(id=self.id))
+            msg.attach(part)
+            content = "*** Content to large to be displayed, see attachment ***"
+        else:
+            content = self.pastie_content.decode('utf8')
+        # message body including full paste if not to large rather than attaching it
         message = '''
 I found a hit for a regular expression on one of the pastebin sites.
 
@@ -400,7 +410,7 @@ Below (after newline) is the content of the pastie:
 
 {content}
 
-        '''.format(site=self.site.name, url=self.public_url, matches=self.matches_to_regex(), content=self.pastie_content.decode('utf8'))
+        '''.format(site=self.site.name, url=self.public_url, matches=self.matches_to_regex(), content=content)
         msg.attach(MIMEText(message))
         # send out the mail
         try:
