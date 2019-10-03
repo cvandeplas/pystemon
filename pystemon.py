@@ -1385,7 +1385,7 @@ class Sqlite3Storage(PastieStorage):
             raise
         logger.debug('Updated pastie {site} {id} in the SQLite database.'.format(site=pastie.site.name, id=pastie.id))
 
-def parse_config_file(configfile):
+def parse_config_file(configfile, debug):
     global yamlconfig
     try:
         yamlconfig = yaml.load(open(configfile))
@@ -1395,6 +1395,11 @@ def parse_config_file(configfile):
             mark = exc.problem_mark
             logger.error("error position: (%s:%s)" % (mark.line + 1, mark.column + 1))
             exit(1)
+    if not debug and 'logging-level' in yamlconfig:
+        if  yamlconfig['logging-level'] in ['NOTSET', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] :
+            logger.setLevel(logging.getLevelName(yamlconfig['logging-level']))
+        else:
+            logger.error("logging level \"%s\" is invalide" % (yamlconfig['logging-level']))
     # TODO verify validity of all config parameters
     for includes in yamlconfig.get("includes", []):
         yamlconfig.update(yaml.load(open(includes)))
@@ -1588,7 +1593,7 @@ if __name__ == "__main__":
         hdlr.setFormatter(formatter)
         logger.addHandler(hdlr)
 
-    storage_engines = parse_config_file(options.config)
+    storage_engines = parse_config_file(options.config, options.debug)
     # run the software
     if options.kill:
         if os.path.isfile('pid'):
