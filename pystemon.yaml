@@ -153,7 +153,7 @@ site:
   pastebin.fr:
     archive-url: 'http://pastebin.fr'
     archive-regex: '<a href="http://pastebin.fr/(\d+)'
-    download-url: 'http://pastebin.fr/{id}'
+    download-url: 'http://pastebin.fr/pastebin.php?dl={id}'
 
 # Exercise related sites
 # this is site related to the LockedShields cyber exercise.
