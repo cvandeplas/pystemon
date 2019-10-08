@@ -13,6 +13,8 @@ strict_regex: no        # when compiling regex, hard fail or not on error
 
 save-thread: no         # Use a separate thread to save pasties
 
+logging-level: INFO     # Define logging level (NOTSET, DEBUG, INFO, WARNING, ERROR, CRITICAL)
+
 db:
   sqlite3:              # Store information about the pastie in a database
     enable: no          # Activate this DB engine   # NOT FULLY IMPLEMENTED
