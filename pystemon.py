@@ -1399,7 +1399,7 @@ def parse_config_file(configfile, debug):
         if  yamlconfig['logging-level'] in ['NOTSET', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] :
             logger.setLevel(logging.getLevelName(yamlconfig['logging-level']))
         else:
-            logger.error("logging level \"%s\" is invalide" % (yamlconfig['logging-level']))
+            logger.error("logging level \"%s\" is invalid" % (yamlconfig['logging-level']))
     # TODO verify validity of all config parameters
     for includes in yamlconfig.get("includes", []):
         yamlconfig.update(yaml.load(open(includes)))
