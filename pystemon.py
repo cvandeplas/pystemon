@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # encoding: utf-8
 
 '''
@@ -1399,7 +1399,7 @@ class Sqlite3Storage(PastieStorage):
 def parse_config_file(configfile):
     global yamlconfig
     try:
-        yamlconfig = yaml.load(open(configfile))
+        yamlconfig = yaml.load(open(configfile), Loader=yaml.FullLoader)
     except yaml.YAMLError as exc:
         logger.error("Error in configuration file:")
         if hasattr(exc, 'problem_mark'):
@@ -1530,7 +1530,7 @@ def main_as_daemon(storage_engines):
 
         if pid > 0:
             pid_file = open('pid', 'w')
-            pid_file.write(unicode(str(pid)))
+            pid_file.write(str(pid))
             pid_file.close()
             print('pystemon started as daemon')
             print('PID: %d' % pid)
