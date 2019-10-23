@@ -26,13 +26,14 @@ from collections import deque
 from datetime import datetime
 try:
     from email.mime.multipart import MIMEMultipart
+    from email.mime.base import MIMEBase
+    from email.mime.text import MIMEText
+    from email import encoders as Encoders
 except ImportError:
     from email.MIMEMultipart import MIMEMultipart
-
-try:
-    from email.mime.text import MIMEText
-except ImportError:
+    from email.MIMEBase import MIMEBase
     from email.MIMEText import MIMEText
+    from email import Encoders
 import gzip
 import hashlib
 import logging.handlers
@@ -402,7 +403,16 @@ class Pastie():
             if match.to is not None:
                 recipients.extend(match.ato)
         msg['To'] = ','.join(recipients)  # here the list needs to be comma separated
-        # message body including full paste rather than attaching it
+        if len(self.pastie_content) > yamlconfig['email']['size-limit']:
+            part = MIMEBase('application', "text/plain")
+            part.set_payload(self.pastie_content.decode('utf8'))
+            Encoders.encode_base64(part)
+            part.add_header('Content-Disposition', 'attachment; filename="{id}.txt"'.format(id=self.id))
+            msg.attach(part)
+            content = "*** Content to large to be displayed, see attachment ***"
+        else:
+            content = self.pastie_content.decode('utf8')
+        # message body including full paste if not to large rather than attaching it
         message = '''
 I found a hit for a regular expression on one of the pastebin sites.
 
@@ -414,7 +424,7 @@ Below (after newline) is the content of the pastie:
 
 {content}
 
-        '''.format(site=self.site.name, url=self.public_url, matches=self.matches_to_regex(), content=self.pastie_content.decode('utf8'))
+        '''.format(site=self.site.name, url=self.public_url, matches=self.matches_to_regex(), content=content)
         msg.attach(MIMEText(message))
         # send out the mail
         try:
@@ -1384,7 +1394,7 @@ class Sqlite3Storage(PastieStorage):
                     'timestamp': datetime.now(),
                     'matches': pastie.matches_to_text()
                     }
-            self.__conect__().execute('''UPDATE pasties SET md5 = :md5,
+            self.__connect__().execute('''UPDATE pasties SET md5 = :md5,
                                             url = :url,
                                             local_path = :local_path,
                                             timestamp  = :timestamp,
@@ -1396,7 +1406,7 @@ class Sqlite3Storage(PastieStorage):
             raise
         logger.debug('Updated pastie {site} {id} in the SQLite database.'.format(site=pastie.site.name, id=pastie.id))
 
-def parse_config_file(configfile):
+def parse_config_file(configfile, debug):
     global yamlconfig
     try:
         yamlconfig = yaml.load(open(configfile), Loader=yaml.FullLoader)
@@ -1406,6 +1416,11 @@ def parse_config_file(configfile):
             mark = exc.problem_mark
             logger.error("error position: (%s:%s)" % (mark.line + 1, mark.column + 1))
             exit(1)
+    if not debug and 'logging-level' in yamlconfig:
+        if  yamlconfig['logging-level'] in ['NOTSET', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] :
+            logger.setLevel(logging.getLevelName(yamlconfig['logging-level']))
+        else:
+            logger.error("logging level \"%s\" is invalid" % (yamlconfig['logging-level']))
     # TODO verify validity of all config parameters
     for includes in yamlconfig.get("includes", []):
         yamlconfig.update(yaml.load(open(includes)))
@@ -1599,7 +1614,7 @@ if __name__ == "__main__":
         hdlr.setFormatter(formatter)
         logger.addHandler(hdlr)
 
-    storage_engines = parse_config_file(options.config)
+    storage_engines = parse_config_file(options.config, options.debug)
     # run the software
     if options.kill:
         if os.path.isfile('pid'):
