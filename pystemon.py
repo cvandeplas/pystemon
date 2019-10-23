@@ -590,7 +590,7 @@ class ThreadPasties(threading.Thread):
                     size=self.queue.qsize(), name=self.name))
             # catch unknown errors
             except Exception as e:
-                msg = "ThreadPasties for {name} crashed unexpectectly, "\
+                msg = "ThreadPasties for {name} crashed unexpectedly, "\
                       "recovering...: {e}".format(name=self.name, e=e)
                 logger.error(msg)
                 logger.debug(traceback.format_exc())
