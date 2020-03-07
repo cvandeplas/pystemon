@@ -147,6 +147,12 @@ site:
     archive-regex: '<a href="http://codepad.org/([a-zA-Z0-9]+)">view'
     download-url: 'http://codepad.org/{id}/raw.txt'
 
+  paste.org.ru:
+    enable: yes
+    archive-url: 'http://paste.org.ru'
+    archive-regex: '<a href=''/\?(\w+)''>'
+    download-url: 'http://paste.org.ru/?{id}'
+ 
   kpaste.net:
     enable: yes
     archive-url: 'http://kpaste.net/'
