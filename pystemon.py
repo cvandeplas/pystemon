@@ -9,8 +9,6 @@
 To be implemented:
 - FIXME set all the config options in the class variables
 - FIXME validate parsing of config file
-- FIXME use syslog logging
-- TODO save files in separate directories depending on the day/week/month. Try to avoid duplicate files
 '''
 
 from bs4 import BeautifulSoup
@@ -362,23 +360,6 @@ class Pastie():
         for match in self.matches:
             res.append(match.to_dict())
         return res
-
-    def save_mongo(self):
-        content = self.pastie_content
-        hash = hashlib.md5()
-        hash.update(content)
-        data = {"hash": hash.hexdigest()}
-        if self.matches:
-            data['matches'] = self.matches_to_dict()
-            data['content'] = content
-        if mongo_save_meta['save']:
-            if mongo_save_meta.get('timestamp', False):
-                data['timestamp'] = datetime.utcnow()
-            if mongo_save_meta.get('url', False):
-                data['url'] = self.public_url
-            if mongo_save_meta.get('site', False):
-                data['site'] = self.site.name
-        mongo_col.insert(data)
 
     def send_email_alert(self):
         msg = MIMEMultipart()
@@ -1202,7 +1183,6 @@ class FileStorage(PastieStorage):
 
     def __save_pastie__(self, pastie):
         directories = []
-        res = []
         full_path = None
         directories.append(self.archive_dir)
         if pastie.matched:
@@ -1258,7 +1238,6 @@ class RedisStorage(PastieStorage):
 
     def __save_pastie__(self, pastie):
         directories = []
-        res = []
         directories.append(self.archive_dir)
         if pastie.matched:
             directories.append(self.save_dir)
@@ -1341,6 +1320,35 @@ class MongoStorage(PastieStorage):
             logger.error('{0}: Invalid query, disabling lookup: {1}'.format(self.name, e))
             self.lookup = False
         return False
+
+
+class TelegramStorage(PastieStorage):
+
+    def __init_storage__(self, **kwargs):
+        self.token = kwargs.get('token')
+        self.chat_id = kwargs.get('chat_id')
+
+    def __save_pastie__(self, pastie):
+        if pastie.matched:
+            message = '''
+I found a hit for a regular expression on one of the pastebin sites.
+
+The site where the paste came from :        {site}
+The original paste was located here:        {url}
+And the regular expressions that matched:   {matches}
+
+Below (after newline) is the content of the pastie:
+
+{content}
+
+        '''.format(site=pastie.site.name, url=pastie.public_url, matches=pastie.matches_to_regex(), content=pastie.pastie_content.decode('utf8'))
+
+            url = 'https://api.telegram.org/bot{0}/sendMessage'.format(self.token)
+            try:
+                logger.debug('Sending message to telegram {} for pastie_id {}'.format(url, pastie.pastie_id))
+                requests.post(url, data={'chat_id': self.chat_id, 'text': message})
+            except Exception as e:
+                logger.warning("Failed to alert through telegram: {0}".format(e))
 
 
 class Sqlite3Storage(PastieStorage):
@@ -1499,8 +1507,6 @@ def parse_config_file(configfile, debug):
                 redis_database = redis_config['database']
                 redis_queue_all = redis_config.get('queue-all', False)
                 redis_lookup = redis_config.get('lookup', False)
-                redis_save_dir = save_dir
-                redis_archive_dir = archive_dir
                 storage_engines.append(RedisStorage(
                     redis_server=redis_server,
                     redis_port=redis_port,
@@ -1529,6 +1535,16 @@ def parse_config_file(configfile, debug):
         exit('ERROR: Cannot import the sqlite3 Python library. Are you sure it is compiled in python?')
     except Exception as e:
         exit('ERROR: Cannot initialize the sqlite3 database: {0}'.format(e))
+
+    try:
+        if yamlconfig['telegram']['enable']:
+            storage_engines.append(TelegramStorage(
+                token=yamlconfig['telegram']['token'],
+                chat_id=yamlconfig['telegram']['chat-id']))
+    except KeyError:
+        logger.debug("No telegram alerting requested")
+    except Exception as e:
+        exit('ERROR: Cannot initialize the telegram alerting: {0}'.format(e))
 
     try:
         mongo_config = yamlconfig.get('mongo', {})
