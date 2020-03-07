@@ -1523,7 +1523,7 @@ def main_as_daemon(storage_engines):
         pid = os.fork()
 
         if pid > 0:
-            pid_file = open('pid', 'w')
+            pid_file = open(yamlconfig['pid']['filename'], 'w')
             pid_file.write(str(pid))
             pid_file.close()
             print('pystemon started as daemon')
@@ -1596,12 +1596,12 @@ if __name__ == "__main__":
     storage_engines = parse_config_file(options.config, options.debug)
     # run the software
     if options.kill:
-        if os.path.isfile('pid'):
-            f = open('pid', 'r')
+        if os.path.isfile(yamlconfig['pid']['filename']):
+            f = open(yamlconfig['pid']['filename'], 'r')
             pid = f.read()
             f.close()
-            os.remove('pid')
-            print("Sending signal to pid: {}".format(pid))
+            os.remove(yamlconfig['pid']['filename'])
+            print "Sending signal to pid: {}".format(pid)
             os.kill(int(pid), 2)
             os._exit(0)
         else:
