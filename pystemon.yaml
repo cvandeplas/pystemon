@@ -127,7 +127,9 @@ site:
     update-min: 40
 
   slexy.org:
-    enable: yes
+    # note: they don't like scraping. Tuning of update-max and update-min is needed!
+    # You will likely also want to enable random user-agent and proxies(see below).
+    enable: no
     archive-url: 'https://slexy.org/recent'
     archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
     download-url: 'https://slexy.org/view/{id}'
@@ -156,12 +158,6 @@ site:
     archive-url: 'http://ideone.com/recent'
     archive-regex: '<a href="/([a-zA-Z0-9]+)">#'
     download-url: 'http://ideone.com/plain/{id}'
-
-  pastebin.ru:
-    enable: yes
-    archive-url: 'http://pastebin.ru/'
-    archive-regex: '<a href="/(\w+)">'
-    download-url: 'http://pastebin.ru/{id}'
 
   pastebin.fr:
     enable: yes
@@ -195,6 +191,12 @@ site:
   #   archive-url: 'http://pastebin.ca'
   #   archive-regex: 'rel="/preview.php\?id=(\d+)'
   #   download-url: 'http://pastebin.ca/{id}'
+
+  # pastebin.ru:
+  #   enable: no
+  #   archive-url: 'http://pastebin.ru/'
+  #   archive-regex: '<a href="/(\w+)">'
+  #   download-url: 'http://pastebin.ru/{id}'
 
   # nopaste.me:
   #  archive-url: 'http://nopaste.me/recent'
