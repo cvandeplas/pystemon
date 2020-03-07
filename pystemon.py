@@ -85,6 +85,7 @@ def make_bound_socket(source_ip):
         return sock
     return bound_socket
 
+
 class PastieSite(threading.Thread):
     '''
     Instances of these threads are responsible for downloading the list of
@@ -109,12 +110,14 @@ class PastieSite(threading.Thread):
             self.save_dir = kwargs['site_save_dir'] + os.sep + name
             if not os.path.exists(self.save_dir):
                 os.makedirs(self.save_dir)
-        except KeyError: pass
+        except KeyError:
+            pass
         try:
             self.archive_dir = kwargs['site_archive_dir'] + os.sep + name
             if not os.path.exists(self.archive_dir):
                 os.makedirs(self.archive_dir)
-        except KeyError: pass
+        except KeyError:
+            pass
         self.archive_compress = kwargs.get('archive_compress', False)
         self.update_min = kwargs['site_update_min']
         self.update_max = kwargs['site_update_max']
@@ -136,7 +139,7 @@ class PastieSite(threading.Thread):
                 # so we first have the old entries and then the new ones
                 last_pasties = self.get_last_pasties()
                 if last_pasties:
-                    #self.__toto__(last_pasties)
+                    # self.__toto__(last_pasties)
                     l = len(last_pasties)
                     while last_pasties:
                         pastie = last_pasties.pop()
@@ -163,7 +166,7 @@ class PastieSite(threading.Thread):
             try:
                 self.storage.save_pastie(pastie)
             except Exception as e:
-                logger.error('Unable to save pastie {0}: {1}'.format(pastie.id,e))
+                logger.error('Unable to save pastie {0}: {1}'.format(pastie.id, e))
 
     def get_last_pasties(self):
         # reset the pasties list
@@ -205,7 +208,7 @@ class PastieSite(threading.Thread):
             return True
         if self.storage is not None:
             if self.storage.seen_pastie(pastie_id, **kwargs):
-                logger.debug('Site[{s}]: Pastie[{id}] found in storage'.format(s=self.name,id=pastie_id))
+                logger.debug('Site[{s}]: Pastie[{id}] found in storage'.format(s=self.name, id=pastie_id))
                 return True
         logger.debug('Site[{0}]: Pastie[{1}] is unknown'.format(self.name, pastie_id))
         return False
@@ -216,9 +219,9 @@ class PastieSite(threading.Thread):
         and remember that we've seen it
         '''
         if self.seen_pastie(pastie_id,
-            url=self.public_url.format(id=pastie_id),
-            sitename=self.name,
-            filename=self.pastie_id_to_filename(pastie_id)):
+                            url=self.public_url.format(id=pastie_id),
+                            sitename=self.name,
+                            filename=self.pastie_id_to_filename(pastie_id)):
             return True
         # We have not yet seen the pastie.
         # Keep in memory that we've seen it using
@@ -232,6 +235,7 @@ class PastieSite(threading.Thread):
         if self.archive_compress:
             filename = filename + ".gz"
         return filename
+
 
 class Pastie():
 
@@ -310,7 +314,7 @@ class Pastie():
                 # only debugging for now
                 self.action_on_miss()
         except Exception as e:
-            logger.error("ERROR: on post-action for pastie {0}: {1}".format(self.id,e))
+            logger.error("ERROR: on post-action for pastie {0}: {1}".format(self.id, e))
 
     def search_content(self):
         if not self.pastie_content:
@@ -368,11 +372,11 @@ class Pastie():
             data['matches'] = self.matches_to_dict()
             data['content'] = content
         if mongo_save_meta['save']:
-            if mongo_save_meta.get('timestamp',False):
+            if mongo_save_meta.get('timestamp', False):
                 data['timestamp'] = datetime.utcnow()
-            if mongo_save_meta.get('url',False):
+            if mongo_save_meta.get('url', False):
                 data['url'] = self.public_url
-            if mongo_save_meta.get('site',False):
+            if mongo_save_meta.get('site', False):
                 data['site'] = self.site.name
         mongo_col.insert(data)
 
@@ -586,6 +590,7 @@ class ThreadPasties(threading.Thread):
                 # signals to queue job is done
                 self.queue.task_done()
 
+
 class PastieSearch():
     def __init__(self, regex):
         # set the re.FLAGS
@@ -622,11 +627,11 @@ class PastieSearch():
         else:
             self.ato = []
         # add any extra things stored in yaml
-        self.extra={}
+        self.extra = {}
         for (k, v) in regex.items():
-          if k in ['search', 'description', 'exclude', 'count', 'regex-flags', 'to']:
-              continue
-          self.extra[k]=v
+            if k in ['search', 'description', 'exclude', 'count', 'regex-flags', 'to']:
+                continue
+            self.extra[k] = v
         self.h = None
 
     def match(self, string):
@@ -654,7 +659,7 @@ class PastieSearch():
 
     def to_dict(self):
         if self.h is None:
-            self.h = {'search':self.search}
+            self.h = {'search': self.search}
             if self.description is not None:
                 self.h['description'] = self.description
             if self.exclude is not None:
@@ -665,9 +670,10 @@ class PastieSearch():
                 self.h['to'] = self.to
             if self.regex_flags is not None:
                 self.h['regex-flags'] = self.regex_flags
-            for (k,v) in self.extra.items():
+            for (k, v) in self.extra.items():
                 self.h[k] = v
         return self.h
+
 
 def main(storage_engines):
     global queues
@@ -702,14 +708,14 @@ def main(storage_engines):
             patterns.append(ps)
         except KeyError:
             if strict:
-               exit("Error: Missing search pattern")
+                exit("Error: Missing search pattern")
             else:
-               logger.error("Error: skipping empty search pattern entry")
+                logger.error("Error: skipping empty search pattern entry")
         except Exception as e:
             if strict:
-               exit("Error: Unable to parse regex '%s': %s" % (search, e))
+                exit("Error: Unable to parse regex '%s': %s" % (search, e))
             else:
-               logger.error("Error: Unable to parse regex '%s': %s" % (search, e))
+                logger.error("Error: Unable to parse regex '%s': %s" % (search, e))
 
     # start thread for proxy file listener
     if yamlconfig['proxy']['random']:
@@ -757,13 +763,13 @@ def main(storage_engines):
             site_archive_url = site_config['archive-url']
             site_archive_regex = site_config['archive-regex']
             t = PastieSite(site_name, site_download_url, site_archive_url, site_archive_regex,
-                    site_public_url = site_config.get('public-url'),
-                    site_update_min = site_config.get('update-min', 10),
-                    site_update_max = site_config.get('update-max', 30),
-                    site_pastie_classname = site_config.get('pastie-classname'),
-                    site_save_dir = yamlconfig['archive'].get('dir'),
-                    site_archive_dir = yamlconfig['archive'].get('dir-all'),
-                    archive_compress = yamlconfig['archive'].get('compress', False))
+                           site_public_url=site_config.get('public-url'),
+                           site_update_min=site_config.get('update-min', 10),
+                           site_update_max=site_config.get('update-max', 30),
+                           site_pastie_classname=site_config.get('pastie-classname'),
+                           site_save_dir=yamlconfig['archive'].get('dir'),
+                           site_archive_dir=yamlconfig['archive'].get('dir-all'),
+                           archive_compress=yamlconfig['archive'].get('compress', False))
             t.set_storage(storage)
             threads.append(t)
             t.setDaemon(True)
@@ -787,6 +793,7 @@ def main(storage_engines):
 
 
 user_agents_list = []
+
 
 def load_user_agents_from_file(filename):
     global user_agents_list
@@ -873,42 +880,44 @@ def failed_proxy(proxy):
         proxies_lock.release()
         logger.info("Proxies left: {0}".format(len(proxies_list)))
 
+
 def __parse_http__(url, session, random_proxy):
     try:
         response = session.get(url, stream=True)
         response.raise_for_status()
-        res = {'response':response}
+        res = {'response': response}
     except HTTPError as e:
         failed_proxy(random_proxy)
         logger.warning("!!Proxy error on {0}.".format(url))
         if 404 == e.code:
             htmlPage = e.read()
             logger.warning("404 from proxy received for {url}".format(url=url))
-            res = {'loop_client':True, 'wait':60}
+            res = {'loop_client': True, 'wait': 60}
         elif 500 == e.code:
             htmlPage = e.read()
             logger.warning("500 from proxy received for {url}".format(url=url))
-            res = {'loop_server':True, 'wait':60}
+            res = {'loop_server': True, 'wait': 60}
         elif 504 == e.code:
             htmlPage = e.read()
             logger.warning("504 from proxy received for {url}".format(url=url))
-            res = {'loop_server':True, 'wait':60}
+            res = {'loop_server': True, 'wait': 60}
         elif 502 == e.code:
             htmlPage = e.read()
             logger.warning("502 from proxy received for {url}".format(url=url))
-            res = {'loop_server':True, 'wait':60}
+            res = {'loop_server': True, 'wait': 60}
         elif 403 == e.code:
             htmlPage = e.read()
             if 'Please slow down' in htmlPage or 'has temporarily blocked your computer' in htmlPage or 'blocked' in htmlPage:
                 logger.warning("Slow down message received for {url}".format(url=url))
-                res = {'loop_server':True, 'wait':60}
+                res = {'loop_server': True, 'wait': 60}
             else:
                 logger.warning("403 from proxy received for {url}, aborting".format(url=url))
-                res = {'abort':True}
+                res = {'abort': True}
         else:
             logger.warning("ERROR: HTTP Error ##### {e} ######################## {url}".format(e=e, url=url))
-            res = {'abort':True}
+            res = {'abort': True}
     return res
+
 
 def __download_url__(url, session, random_proxy):
     try:
@@ -918,32 +927,33 @@ def __download_url__(url, session, random_proxy):
         if random_proxy:  # remove proxy from the list if needed
             failed_proxy(random_proxy)
             logger.warning("Failed to download the page because of proxy error: {0}".format(url))
-            res = {'loop_server':True}
+            res = {'loop_server': True}
         elif 'timed out' in e.reason:
             logger.warning("Timed out or slow down for {url}".format(url=url))
-            res = {'loop_server':True, 'wait':60}
-    except socket.timeout:
+            res = {'loop_server': True, 'wait': 60}
+    except socket.timeout as e:
         logger.debug("ERROR: timeout ##### {e} ######################## ".format(e=e, url=url))
         if random_proxy:  # remove proxy from the list if needed
             failed_proxy(random_proxy)
             logger.warning("Failed to download the page because of socket error {0}:".format(url))
-            res = {'loop_server':True}
+            res = {'loop_server': True}
     except requests.ConnectionError as e:
         logger.debug("ERROR: connection failed ##### {e} ######################## ".format(e=e, url=url))
         if random_proxy:  # remove proxy from the list if needed
             failed_proxy(random_proxy)
         logger.warning("Failed to download the page because of connection error: {0}".format(url))
         logger.error(traceback.format_exc())
-        res = {'loop_server':True, 'wait':60}
+        res = {'loop_server': True, 'wait': 60}
     except Exception as e:
         logger.debug("ERROR: Other HTTPlib error ##### {e} ######################## ".format(e=e, url=url))
         if random_proxy:  # remove proxy from the list if needed
             failed_proxy(random_proxy)
         logger.warning("Failed to download the page because of other HTTPlib error proxy error: {0}".format(url))
         logger.error(traceback.format_exc())
-        res = {'loop_server':True}
+        res = {'loop_server': True}
     # do NOT try to download the url again here, as we might end in enless loop
     return res
+
 
 ''' let's not recurse where exceptions can raise exceptions can raise exceptions can...'''
 def download_url(url, data=None, cookie=None):
@@ -951,7 +961,7 @@ def download_url(url, data=None, cookie=None):
     loop_client = 0
     loop_server = 0
     wait = 0
-    while (response is None) and (loop_client<retries_client) and (loop_server<retries_server):
+    while (response is None) and (loop_client < retries_client) and (loop_server < retries_server):
         try:
             session = requests.Session()
             random_proxy = get_random_proxy()
@@ -998,6 +1008,7 @@ def download_url(url, data=None, cookie=None):
 
     return response
 
+
 class StorageScheduler():
     def __init__(self, storage, **kwargs):
         self.storage = storage
@@ -1009,11 +1020,14 @@ class StorageScheduler():
     def seen_pastie(self, pastie_id, **kwargs):
         raise NotImplementedError
 
+
 class StorageSync(StorageScheduler):
     def save_pastie(self, pastie, timeout):
         self.storage.save_pastie(pastie)
+
     def seen_pastie(self, pastie_id, **kwargs):
         return self.storage.seen_pastie(pastie_id, **kwargs)
+
 
 # LATER: implement an async class
 class StorageThread(threading.Thread, StorageScheduler):
@@ -1022,7 +1036,7 @@ class StorageThread(threading.Thread, StorageScheduler):
         StorageScheduler.__init__(self, storage, **kwargs)
         try:
             size = int(kwargs['queue_size'])
-        except:
+        except Exception:
             size = 0
         self.queue = Queue(size)
         self.kill_received = False
@@ -1031,16 +1045,17 @@ class StorageThread(threading.Thread, StorageScheduler):
         logger.info('{0}: Thread for saving pasties started'.format(self.name))
         # loop over the queue
         while not self.kill_received:
-            #pastie = None
+            # pastie = None
             try:
                 # grabs pastie from queue
                 pastie = self.queue.get(True, 5)
                 # save the pasties in each storage
                 self.storage.save_pastie(pastie)
-            except Empty: pass
+            except Empty:
+                pass
             # catch unknown errors
             except Exception as e:
-                logger.error("{0}: Thread for saving pasties crashed unexpectectly, recovering...: {1}".format(self.name,e))
+                logger.error("{0}: Thread for saving pasties crashed unexpectectly, recovering...: {1}".format(self.name, e))
                 logger.debug(traceback.format_exc())
             finally:
                 # to be on the safe side of gf
@@ -1060,15 +1075,19 @@ class StorageThread(threading.Thread, StorageScheduler):
     def seen_pastie(self, pastie_id, **kwargs):
         return self.storage.seen_pastie(pastie_id, **kwargs)
 
+
 class StorageDispatcher():
     def __init__(self):
         self.__storage = []
         self.lock = threading.Lock()
+
     def add_storage(self, thread_storage):
         self.__storage.append(thread_storage)
+
     def save_pastie(self, pastie, timeout=5):
         for t in self.__storage:
             t.save_pastie(pastie, timeout)
+
     def seen_pastie(self, pastie_id, **kwargs):
         for t in self.__storage:
             if t.seen_pastie(pastie_id, **kwargs):
@@ -1076,6 +1095,7 @@ class StorageDispatcher():
                 return True
         logger.debug('Pastie[{0}] unknown'.format(pastie_id))
         return False
+
 
 class PastieStorage():
     def __init__(self, **kwargs):
@@ -1087,6 +1107,7 @@ class PastieStorage():
         except Exception as e:
             logger.error('{0}: unable to initialize storage backend: {1}'.format(self.name, e))
             raise
+
     def format_directory(self, directory):
         d = datetime.now()
         year = str(d.year)
@@ -1098,10 +1119,13 @@ class PastieStorage():
         if len(day) < 2:
             day = "0" + day
         return directory + os.sep + year + os.sep + month + os.sep + day
+
     def __init_storage__(self, **kwargs):
         raise NotImplementedError
+
     def __save_pastie__(self, pastie):
         raise NotImplementedError
+
     def save_pastie(self, pastie):
         try:
             start = time.time()
@@ -1112,8 +1136,10 @@ class PastieStorage():
         except Exception as e:
             logger.error('{0}: unable to save pastie[{1}]: {2}'.format(self.name, pastie.id, e))
             raise
+
     def __seen_pastie__(self, pastie_id, **kwargs):
         raise NotImplementedError
+
     def seen_pastie(self, pastie_id, **kwargs):
         if not self.lookup:
             return False
@@ -1127,6 +1153,7 @@ class PastieStorage():
         except Exception as e:
             logger.error('{0}: unable to lookup pastie[{1}]: {2}'.format(self.name, pastie_id, e))
             raise
+
 
 class FileStorage(PastieStorage):
 
@@ -1182,11 +1209,12 @@ class FileStorage(PastieStorage):
                 if os.path.exists(fullpath):
                     logger.debug('{0}: file {1} exists'.format(self.name, fullpath))
                     return True
-        except KeyError: pass
+        except KeyError:
+            pass
         return False
 
-class RedisStorage(PastieStorage):
 
+class RedisStorage(PastieStorage):
     def __getconn(self):
         # LATER: implement pipelining
         return redis.StrictRedis(host=self.server, port=self.port, db=self.database)
@@ -1194,7 +1222,7 @@ class RedisStorage(PastieStorage):
     def __init_storage__(self, **kwargs):
         self.save_dir = kwargs['save_dir']
         self.archive_dir = kwargs['archive_dir']
-        self.server= kwargs['redis_server']
+        self.server = kwargs['redis_server']
         self.port = kwargs['redis_port']
         self.database = kwargs['redis_database']
         self.queue_all = kwargs['redis_queue_all']
@@ -1216,8 +1244,8 @@ class RedisStorage(PastieStorage):
                 self.__getconn().lpush('pastes', full_path)
                 logger.debug('Site[{site}]: Sent pastie[{id}][{disk}] to redis.'.format(site=pastie.site.name, id=pastie.id, disk=full_path))
 
-class MongoStorage(PastieStorage):
 
+class MongoStorage(PastieStorage):
     def __init_storage__(self, **kwargs):
         self.url = kwargs['url']
         self.database = kwargs['database']
@@ -1237,7 +1265,7 @@ class MongoStorage(PastieStorage):
         if self.user and self.password:
             try:
                 self.db.authenticate(name=self.user, password=self.password)
-            except Exception as e:
+            except Exception:
                 logger.error("ERROR: authentication to mongodb failed")
                 raise
         self.client.server_info()
@@ -1271,13 +1299,14 @@ class MongoStorage(PastieStorage):
         try:
             if self.save_id and self.save_site:
                 site = kwargs['site']
-                return self.col.find_one({'pastie_id':pastie_id, 'site':site})
+                return self.col.find_one({'pastie_id': pastie_id, 'site': site})
             if self.save_url:
-                url=kwargs['url']
-                return self.col.find_one({'url':url})
+                url = kwargs['url']
+                return self.col.find_one({'url': url})
             logger.error('{0}: Not enough meta-data saved, disabling lookup'.format(self.name))
             self.lookup = False
-        except KeyError: pass
+        except KeyError:
+            pass
         except TypeError as e:
             logger.error('{0}: Invalid query parameters: {1}'.format(self.name, e))
             pass
@@ -1286,16 +1315,15 @@ class MongoStorage(PastieStorage):
             self.lookup = False
         return False
 
-class Sqlite3Storage(PastieStorage):
 
+class Sqlite3Storage(PastieStorage):
     def __connect__(self):
         thread_id = threading.current_thread().ident
         try:
             with self.lock:
                 cursor = self.connections[thread_id]
         except KeyError:
-            logger.debug('Re-opening Sqlite databse {0} in thread[{1}]'.format(
-               self.filename, thread_id))
+            logger.debug('Re-opening Sqlite databse {0} in thread[{1}]'.format(self.filename, thread_id))
             # autocommit and write ahead logging
             # works well because we have only 1 writter for n readers
             db_conn = sqlite3.connect(self.filename, isolation_level=None)
@@ -1323,7 +1351,7 @@ class Sqlite3Storage(PastieStorage):
                     timestamp DATE,
                     matches TEXT
                     )''')
-            #self.db_conn.commit()
+            # self.db_conn.commit()
         except sqlite3.DatabaseError as e:
             raise Exception('Problem with SQLite database {0}: {1}'.format(self.filename, e))
 
@@ -1343,7 +1371,8 @@ class Sqlite3Storage(PastieStorage):
             logger.debug('seen {0} in sqlite?: {1}'.format(
                 pastie_id, pastie_in_db and pastie_in_db[0]))
             return pastie_in_db and pastie_in_db[0]
-        except KeyError: pass
+        except KeyError:
+            pass
         return False
 
     def __add(self, pastie):
@@ -1357,7 +1386,7 @@ class Sqlite3Storage(PastieStorage):
                     'matches': pastie.matches_to_text()
                     }
             self.__connect__().execute('INSERT INTO pasties VALUES (:site, :id, :md5, :url, :local_path, :timestamp, :matches)', data)
-            #self.db_conn.commit()
+            # self.db_conn.commit()
         except sqlite3.DatabaseError as e:
             logger.error('Cannot add pastie {site} {id} in the SQLite database: {error}'.format(site=pastie.site.name, id=pastie.id, error=e))
             raise
@@ -1379,11 +1408,12 @@ class Sqlite3Storage(PastieStorage):
                                             timestamp  = :timestamp,
                                             matches = :matches
                      WHERE site = :site AND id = :id''', data)
-            #self.db_conn.commit()
+            # self.db_conn.commit()
         except sqlite3.DatabaseError as e:
             logger.error('Cannot add pastie {site} {id} in the SQLite database: {error}'.format(site=pastie.site.name, id=pastie.id, error=e))
             raise
         logger.debug('Updated pastie {site} {id} in the SQLite database.'.format(site=pastie.site.name, id=pastie.id))
+
 
 def parse_config_file(configfile, debug):
     global yamlconfig
@@ -1396,7 +1426,7 @@ def parse_config_file(configfile, debug):
             logger.error("error position: (%s:%s)" % (mark.line + 1, mark.column + 1))
             exit(1)
     if not debug and 'logging-level' in yamlconfig:
-        if  yamlconfig['logging-level'] in ['NOTSET', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] :
+        if yamlconfig['logging-level'] in ['NOTSET', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
             logger.setLevel(logging.getLevelName(yamlconfig['logging-level']))
         else:
             logger.error("logging level \"%s\" is invalid" % (yamlconfig['logging-level']))
@@ -1416,13 +1446,13 @@ def parse_config_file(configfile, debug):
     try:
         if archive['save'] or archive['save-all']:
             if archive['save']:
-               save_dir=archive['dir']
+                save_dir = archive['dir']
             else:
-               save_dir=None
+                save_dir = None
             if archive['save-all']:
-               archive_dir=archive['dir-all']
+                archive_dir = archive['dir-all']
             else:
-               archive_dir=None
+                archive_dir = None
         if archive['save'] or archive['save-all']:
             storage_engines.append(FileStorage(
                 lookup=True,
@@ -1437,13 +1467,13 @@ def parse_config_file(configfile, debug):
             if redis_config.get('queue', False):
                 global redis
                 import redis
-                redis_server=redis_config['server']
-                redis_port=redis_config['port']
-                redis_database=redis_config['database']
-                redis_queue_all=redis_config.get('queue-all', False)
-                redis_lookup=redis_config.get('lookup', False)
-                redis_save_dir=save_dir
-                redis_archive_dir=archive_dir
+                redis_server = redis_config['server']
+                redis_port = redis_config['port']
+                redis_database = redis_config['database']
+                redis_queue_all = redis_config.get('queue-all', False)
+                redis_lookup = redis_config.get('lookup', False)
+                redis_save_dir = save_dir
+                redis_archive_dir = archive_dir
                 storage_engines.append(RedisStorage(
                     redis_server=redis_server,
                     redis_port=redis_port,
@@ -1516,6 +1546,7 @@ def parse_config_file(configfile, debug):
         exit('ERROR: Unable to initialize mongo storage: {0}'.format(e))
 
     return storage_engines
+
 
 def main_as_daemon(storage_engines):
     try:
@@ -1601,7 +1632,7 @@ if __name__ == "__main__":
             pid = f.read()
             f.close()
             os.remove(yamlconfig['pid']['filename'])
-            print "Sending signal to pid: {}".format(pid)
+            print("Sending signal to pid: {}".format(pid))
             os.kill(int(pid), 2)
             os._exit(0)
         else:
