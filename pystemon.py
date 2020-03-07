@@ -746,8 +746,19 @@ def main(storage_engines):
             s = StorageSync(db)
             storage.add_storage(s)
 
-    # spawn a pool of threads per PastieSite, and pass them a queue instance
+    # Build array of enabled sites.
+    sites_enabled = []
     for site in yamlconfig['site']:
+        if yamlconfig['site'][site].get('enable'):
+            logger.info("Site: {} is enabled, adding to pool...".format(site))
+            sites_enabled.append(site)
+        elif yamlconfig['site'][site].get('enable') is False:
+            logger.info("Site: {} is disabled.".format(site))
+        else:
+            logger.warning("Site: {} is not enabled or disabled in config file. We just assume it disabled.".format(site))
+
+    # spawn a pool of threads per PastieSite, and pass them a queue instance
+    for site in sites_enabled:
         queues[site] = Queue()
         for i in range(yamlconfig['threads']):
             t = ThreadPasties(queues[site], site)
@@ -755,18 +766,17 @@ def main(storage_engines):
             t.setDaemon(True)
             t.start()
 
-    sites = []
     # build threads to download the last pasties
-    for (site_name, site_config) in yamlconfig['site'].items():
+    for site_name in sites_enabled:
         try:
-            site_download_url = site_config['download-url']
-            site_archive_url = site_config['archive-url']
-            site_archive_regex = site_config['archive-regex']
+            site_download_url = yamlconfig['site'][site_name]['download-url']
+            site_archive_url = yamlconfig['site'][site_name]['archive-url']
+            site_archive_regex = yamlconfig['site'][site_name]['archive-regex']
             t = PastieSite(site_name, site_download_url, site_archive_url, site_archive_regex,
-                           site_public_url=site_config.get('public-url'),
-                           site_update_min=site_config.get('update-min', 10),
-                           site_update_max=site_config.get('update-max', 30),
-                           site_pastie_classname=site_config.get('pastie-classname'),
+                           site_public_url=yamlconfig['site'][site_name].get('public-url'),
+                           site_update_min=yamlconfig['site'][site_name].get('update-min', 10),
+                           site_update_max=yamlconfig['site'][site_name].get('update-max', 30),
+                           site_pastie_classname=yamlconfig['site'][site_name].get('pastie-classname'),
                            site_save_dir=yamlconfig['archive'].get('dir'),
                            site_archive_dir=yamlconfig['archive'].get('dir-all'),
                            archive_compress=yamlconfig['archive'].get('compress', False))
@@ -774,7 +784,6 @@ def main(storage_engines):
             threads.append(t)
             t.setDaemon(True)
             t.start()
-            sites.append(t)
         except Exception as e:
             logger.error('Unable to initialize pastie site {0}: {1}'.format(site_name, e))
 
