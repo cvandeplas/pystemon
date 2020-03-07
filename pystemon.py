@@ -877,6 +877,9 @@ def get_random_proxy():
 
 
 def failed_proxy(proxy):
+    if len(proxies_list) == 1:
+        logger.info("Failing proxy {} not removed as it's the only proxy left.".format(proxy))
+        return
     proxies_failed.append(proxy)
     if proxies_failed.count(proxy) >= 2 and proxy in proxies_list:
         logger.info("Removing proxy {0} from proxy list because of to many errors errors.".format(proxy))
