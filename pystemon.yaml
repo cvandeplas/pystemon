@@ -1,6 +1,9 @@
 #network:   # Network settings
 #  ip: '1.1.1.1'  # Specify source IP address if you want to bind on a specific one
 
+pid:
+  filename: '/var/run/pystemon.pid'
+
 archive:
   save: yes             # Keep a copy of pasties that triggered alerts
   save-all: yes         # Keep a copy of all pasties
