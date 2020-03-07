@@ -172,6 +172,12 @@ site:
     archive-regex: '<a href="http://pastebin.fr/(\d+)'
     download-url: 'http://pastebin.fr/pastebin.php?dl={id}'
 
+  pastebin.gr:
+    enable: yes
+    archive-url: 'http://pastebin.gr/archive'
+    archive-regex: '<td><a href="(\d+)" title='
+    download-url: 'http://pastebin.gr/paste.php?download&id={id}'
+
   # Exercise related sites
   # this is site related to the LockedShields Cyber exercise.
   pastebin.berylia.org:
