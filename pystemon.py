@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # encoding: utf-8
 
 '''
@@ -98,6 +98,7 @@ class PastieSite(threading.Thread):
         self.public_url = download_url
         self.archive_url = archive_url
         self.archive_regex = archive_regex
+        self.metadata_url = None
         try:
             self.ip_addr = yamlconfig['network']['ip']
             # true_socket = socket.socket
@@ -116,6 +117,12 @@ class PastieSite(threading.Thread):
                 os.makedirs(self.archive_dir)
         except KeyError:
             pass
+
+        if kwargs['site_public_url'] is not None:
+            self.public_url = kwargs['site_public_url']
+        if kwargs['site_metadata_url'] is not None:
+            self.metadata_url = kwargs['site_metadata_url']
+
         self.archive_compress = kwargs.get('archive_compress', False)
         self.update_min = kwargs['site_update_min']
         self.update_max = kwargs['site_update_max']
@@ -138,13 +145,13 @@ class PastieSite(threading.Thread):
                 last_pasties = self.get_last_pasties()
                 if last_pasties:
                     # self.__toto__(last_pasties)
-                    l = len(last_pasties)
+                    amount = len(last_pasties)
                     while last_pasties:
                         pastie = last_pasties.pop()
                         queues[self.name].put(pastie)  # add pastie to queue
                         del(pastie)
                     logger.info("Found {amount} new pasties for site {site}. There are now {qsize} pasties to be downloaded.".format(
-                        amount=l,
+                        amount=amount,
                         site=self.name,
                         qsize=queues[self.name].qsize()))
             # catch unknown errors
@@ -241,11 +248,15 @@ class Pastie():
         self.site = site
         self.id = pastie_id
         self.pastie_content = None
+        self.pastie_metadata = None
         self.matches = []
         self.matched = False
         self.md5 = None
         self.url = self.site.download_url.format(id=self.id)
         self.public_url = self.site.public_url.format(id=self.id)
+        self.metadata_url = None
+        if self.site.metadata_url is not None:
+            self.metadata_url = self.site.metadata_url.format(id=self.id)
         self.filename = self.site.pastie_id_to_filename(self.id)
 
     def hash_pastie(self):
@@ -257,6 +268,11 @@ class Pastie():
                 logger.error('Pastie {site} {id} md5 problem: {e}'.format(site=self.site.name, id=self.id, e=e))
 
     def fetch_pastie(self):
+        if self.metadata_url is not None:
+            response = download_url(self.metadata_url)
+            if response is not None:
+                response = response.content
+                self.pastie_metadata = response
         response = download_url(self.url)
         if response is not None:
             response = response.content
@@ -286,7 +302,6 @@ class Pastie():
     def fetch_and_process_pastie(self):
         # download pastie
         self.__fetch_pastie__()
-        content = self.pastie_content
         # check pastie
         if self.pastie_content is None:
             return
@@ -579,7 +594,7 @@ class ThreadPasties(threading.Thread):
                     size=self.queue.qsize(), name=self.name))
             # catch unknown errors
             except Exception as e:
-                msg = "ThreadPasties for {name} crashed unexpectectly, "\
+                msg = "ThreadPasties for {name} crashed unexpectedly, "\
                       "recovering...: {e}".format(name=self.name, e=e)
                 logger.error(msg)
                 logger.debug(traceback.format_exc())
@@ -773,6 +788,7 @@ def main(storage_engines):
             site_archive_regex = yamlconfig['site'][site_name]['archive-regex']
             t = PastieSite(site_name, site_download_url, site_archive_url, site_archive_regex,
                            site_public_url=yamlconfig['site'][site_name].get('public-url'),
+                           site_metadata_url=yamlconfig['site'][site_name].get('metadata-url'),
                            site_update_min=yamlconfig['site'][site_name].get('update-min', 10),
                            site_update_max=yamlconfig['site'][site_name].get('update-max', 30),
                            site_pastie_classname=yamlconfig['site'][site_name].get('pastie-classname'),
@@ -966,8 +982,8 @@ def __download_url__(url, session, random_proxy):
     return res
 
 
-''' let's not recurse where exceptions can raise exceptions can raise exceptions can...'''
 def download_url(url, data=None, cookie=None):
+    # let's not recurse where exceptions can raise exceptions can raise exceptions can...
     response = None
     loop_client = 0
     loop_server = 0
@@ -1197,11 +1213,16 @@ class FileStorage(PastieStorage):
             full_path = self.format_directory(directory) + os.sep + pastie.filename
             logger.debug('Site[{site}]: Writing pastie[{id}][{disk}] to disk.'.format(site=pastie.site.name, id=pastie.id, disk=full_path))
             if pastie.site.archive_compress:
-                f = gzip.open(full_path, 'wb')
+                with gzip.open(full_path, 'wb') as f:
+                    f.write(pastie.pastie_content)
             else:
-                f = open(full_path, 'wb')
-            f.write(pastie.pastie_content)
-            f.close()
+                with open(full_path, 'wb') as f:
+                    f.write(pastie.pastie_content)
+            # Writing pastie metadata in a separate file if they exist
+            if pastie.pastie_metadata:
+                logger.debug('Site[{site}]: Writing pastie[{id}][{disk}] metadata to disk.'.format(site=pastie.site.name, id=pastie.id, disk=full_path))
+                with open(full_path + ".metadata", 'wb') as f:
+                    f.write(pastie.pastie_metadata)
             logger.debug('Site[{site}]: Wrote pastie[{id}][{disk}] to disk.'.format(site=pastie.site.name, id=pastie.id, disk=full_path))
         return full_path
 
