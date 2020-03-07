@@ -3,7 +3,7 @@ pystemon
 Monitoring tool for PasteBin-alike sites written in Python
 
 Copyleft AGPLv3 - Christophe Vandeplas - christophe@vandeplas.com  
-Feel free to use the code, but please share the changes you've made
+Feel free to use the code, but please share the changes you've made by doing Pull Requests! 
 
 Features:
 ---------
@@ -20,11 +20,14 @@ Features:
 * removes a proxy if it is unreliable (fails 5 times)
 * (optional) compress saved files with Gzip. (no zip to limit external dependencies)
 * can run as daemon
+* multitude of outputs: file, email, sqlite, redis, mongodb, telegram
 
 Python Dependencies
 -------------------
-Python dependencies can be installed with: `pip3 -r requirements.txt`
-* PyMongo (For Optional Mongodb support)
+Python dependencies can be installed with: `pip3 -r requirements.txt`.
+Optional ones are:
+* PyMongo (For Mongodb support)
+* redis (For redis support)
 
 
 Usage
