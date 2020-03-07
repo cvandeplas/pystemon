@@ -152,6 +152,7 @@ site:
     archive-url: 'http://paste.org.ru'
     archive-regex: '<a href=''/\?(\w+)''>'
     download-url: 'http://paste.org.ru/?{id}'
+    pastie-classname: PastiePasteOrgRu
  
   kpaste.net:
     enable: yes

@@ -436,8 +436,7 @@ Below (after newline) is the content of the pastie:
 class PastieBerylia(Pastie):
     '''
     Custom Pastie class for the berylia.org site, related to the LockedShields cyber exercise
-    This class overloads the fetch_pastie function to do the form
-    submit to get the raw pastie
+    This class overloads the fetch_pastie function to extract the pastie from the page
     '''
 
     def __init__(self, site, pastie_id):
@@ -452,6 +451,25 @@ class PastieBerylia(Pastie):
             if json_pastie:
                 # and extract the code
                 self.pastie_content = json_pastie['paste']
+        return self.pastie_content
+
+
+class PastiePasteOrgRu(Pastie):
+    '''
+    Custom Pastie class for the paste.org.ru site,
+    This class overloads the fetch_pastie function to extract the pastie from the page
+    '''
+
+    def __init__(self, site, pastie_id):
+        Pastie.__init__(self, site, pastie_id)
+
+    def fetch_pastie(self):
+        response = download_url(self.url)
+        if response.text:
+            htmlDom = BeautifulSoup(response.text, 'lxml')
+            if not htmlDom:
+                return self.pastie_content
+            self.pastie_content = htmlDom.find('textarea').contents.pop().encode('utf-8')
         return self.pastie_content
 
 
