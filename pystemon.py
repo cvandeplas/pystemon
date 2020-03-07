@@ -1427,7 +1427,7 @@ class Sqlite3Storage(PastieStorage):
 def parse_config_file(configfile, debug):
     global yamlconfig
     try:
-        yamlconfig = yaml.load(open(configfile))
+        yamlconfig = yaml.load(open(configfile), Loader=yaml.FullLoader)
     except yaml.YAMLError as exc:
         logger.error("Error in configuration file:")
         if hasattr(exc, 'problem_mark'):
