@@ -1369,7 +1369,7 @@ Below (after newline) is the content of the pastie:
 
             url = 'https://api.telegram.org/bot{0}/sendMessage'.format(self.token)
             try:
-                logger.debug('Sending message to telegram {} for pastie_id {}'.format(url, pastie.pastie_id))
+                logger.debug('Sending message to telegram {} for pastie_id {}'.format(url, pastie.id))
                 requests.post(url, data={'chat_id': self.chat_id, 'text': message})
             except Exception as e:
                 logger.warning("Failed to alert through telegram: {0}".format(e))
