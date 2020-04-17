@@ -122,6 +122,7 @@ site:
     update-max: 50
     update-min: 40
 
+  # Note: The official scraping has been discontinued: https://twitter.com/pastebin/status/1250455777069817856?s=20
   # See https://pastebin.com/api_scraping_faq , you will need a pro account on pastebin
   pastebin.com_pro:
     enable: no
