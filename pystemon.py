@@ -878,7 +878,7 @@ def load_proxies_from_file(filename):
     for line in f:
         line = line.strip()
         if line:  # LATER verify if the proxy line has the correct structure
-            proxies_list.add(line)
+            proxies_list.append(line)
     logger.debug('Found {count} proxies in file "{file}"'.format(file=filename, count=len(proxies_list)))
 
 
