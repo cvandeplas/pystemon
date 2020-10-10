@@ -111,6 +111,7 @@ site:
 #                       # is used for display in logging and e-mail notifications
 #    update-max: 40     # every X seconds check for new updates to see if new pasties are available
 #    update-min: 30     # a random number will be chosen between these two numbers
+#    throttling: 0      # Number of MILLIseconds to wait between downloads
 #    pastie-classname:  # OPTIONAL: The name of a custom Class that inherits from Pastie
 #                       # This is practical for sites that require custom fetchPastie() functions
 
@@ -133,15 +134,18 @@ site:
     metadata-url: 'https://scrape.pastebin.com/api_scrape_item_meta.php?i={id}'
     update-max: 50
     update-min: 40
+    throttling: 1000
 
   slexy.org:
     # note: they don't like scraping. Tuning of update-max and update-min is needed!
     # You will likely also want to enable random user-agent and proxies(see below).
+    # See https://slexy.org/tos for more information
     enable: no
     archive-url: 'https://slexy.org/recent'
     archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
     download-url: 'https://slexy.org/view/{id}'
     pastie-classname: PastieSlexyOrg
+    throttling: 1000
 
   gist.github.com:
     enable: yes
