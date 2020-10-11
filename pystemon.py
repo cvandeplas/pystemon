@@ -42,12 +42,14 @@ import json
 import smtplib
 import socket
 import sys
+import signal
 import traceback
 import threading
 # LATER: multiprocessing to parse regex
 import time
 from io import open
 import requests
+from pastie.proxy import ProxyList
 
 try:
     from urllib.error import HTTPError, URLError
@@ -75,6 +77,8 @@ retries_server = 100
 socket.setdefaulttimeout(10)  # set a default timeout of 10 seconds to download the page (default = unlimited)
 true_socket = socket.socket
 
+global proxies_list
+proxies_list = None
 
 def make_bound_socket(source_ip):
     def bound_socket(*a, **k):
@@ -712,10 +716,16 @@ class PastieSearch():
         return self.h
 
 
+def cleanup(signal, frame):
+    global threads
+    for t in threads:
+        t.kill_received = True
+
 def main(storage_engines):
     global queues
     global threads
     global patterns
+    global proxies_list
     queues = {}
     threads = []
     patterns = []
@@ -756,10 +766,8 @@ def main(storage_engines):
 
     # start thread for proxy file listener
     if yamlconfig['proxy']['random']:
-        t = ThreadProxyList(yamlconfig['proxy']['file'])
+        t = proxies_list.monitor()
         threads.append(t)
-        t.setDaemon(True)
-        t.start()
 
     save_thread = yamlconfig.get('save-thread', False)
     storage = StorageDispatcher()
@@ -844,6 +852,7 @@ def main(storage_engines):
         except Exception as e:
             logger.error('Unable to initialize pastie site {0}: {1}'.format(site_name, e))
 
+    signal.signal(signal.SIGTERM, cleanup)
     # wait while all the threads are running and someone sends CTRL+C
     while True:
         try:
@@ -880,83 +889,14 @@ def get_random_user_agent():
         return random.choice(user_agents_list)
     return 'Python-urllib/2.7'
 
-
-proxies_failed = []
-proxies_lock = threading.Lock()
-proxies_list = []
-
-
-class ThreadProxyList(threading.Thread):
-    '''
-    Threaded file listener for proxy list file. Modification to the file results
-    in updating the proxy list.
-    '''
-    global proxies_list
-
-    def __init__(self, filename):
-        threading.Thread.__init__(self)
-        self.filename = filename
-        self.last_mtime = 0
-        self.kill_received = False
-
-    def run(self):
-        logger.info('ThreadProxyList started')
-        while not self.kill_received:
-            mtime = os.stat(self.filename).st_mtime
-            if mtime != self.last_mtime:
-                logger.debug('Proxy configuration file changed. Reloading proxy list.')
-                proxies_lock.acquire()
-                load_proxies_from_file(self.filename)
-                self.last_mtime = mtime
-                proxies_lock.release()
-
-
-def load_proxies_from_file(filename):
-    global proxies_list
-    try:
-        f = open(filename)
-    except Exception as e:
-        logger.error('Configuration problem: proxyfile "{file}" not found or not readable: {e}'.format(file=filename, e=e))
-    for line in f:
-        line = line.strip()
-        if line:  # LATER verify if the proxy line has the correct structure
-            proxies_list.append(line)
-    logger.debug('Found {count} proxies in file "{file}"'.format(file=filename, count=len(proxies_list)))
-
-
-def get_random_proxy():
-    global proxies_list
-    proxy = None
-    proxies_lock.acquire()
-    if proxies_list:
-        proxy = random.choice(tuple(proxies_list))
-    proxies_lock.release()
-    return proxy
-
-
-def failed_proxy(proxy):
-    if len(proxies_list) == 1:
-        logger.info("Failing proxy {} not removed as it's the only proxy left.".format(proxy))
-        return
-    proxies_failed.append(proxy)
-    if proxies_failed.count(proxy) >= 2 and proxy in proxies_list:
-        logger.info("Removing proxy {0} from proxy list because of to many errors errors.".format(proxy))
-        proxies_lock.acquire()
-        try:
-            proxies_list.remove(proxy)
-        except ValueError:
-            pass
-        proxies_lock.release()
-        logger.info("Proxies left: {0}".format(len(proxies_list)))
-
-
 def __parse_http__(url, session, random_proxy):
+    global proxies_list
     try:
         response = session.get(url, stream=True)
         response.raise_for_status()
         res = {'response': response}
     except HTTPError as e:
-        failed_proxy(random_proxy)
+        proxies_list.failed_proxy(random_proxy)
         logger.warning("!!Proxy error on {0}.".format(url))
         if 404 == e.code:
             htmlPage = e.read()
@@ -998,12 +938,13 @@ def __parse_http__(url, session, random_proxy):
 
 
 def __download_url__(url, session, random_proxy):
+    global proxies_list
     try:
         res = __parse_http__(url, session, random_proxy)
     except URLError as e:
         logger.debug("ERROR: URL Error ##### {e} ######################## ".format(e=e, url=url))
         if random_proxy:  # remove proxy from the list if needed
-            failed_proxy(random_proxy)
+            proxies_list.failed_proxy(random_proxy)
             logger.warning("Failed to download the page because of proxy error: {0}".format(url))
             res = {'loop_server': True}
         elif 'timed out' in e.reason:
@@ -1012,20 +953,20 @@ def __download_url__(url, session, random_proxy):
     except socket.timeout as e:
         logger.debug("ERROR: timeout ##### {e} ######################## ".format(e=e, url=url))
         if random_proxy:  # remove proxy from the list if needed
-            failed_proxy(random_proxy)
+            proxies_list.failed_proxy(random_proxy)
             logger.warning("Failed to download the page because of socket error {0}:".format(url))
             res = {'loop_server': True}
     except requests.ConnectionError as e:
         logger.debug("ERROR: connection failed ##### {e} ######################## ".format(e=e, url=url))
         if random_proxy:  # remove proxy from the list if needed
-            failed_proxy(random_proxy)
+            proxies_list.failed_proxy(random_proxy)
         logger.warning("Failed to download the page because of connection error: {0}".format(url))
         logger.error(traceback.format_exc())
         res = {'loop_server': True, 'wait': 60}
     except Exception as e:
         logger.debug("ERROR: Other HTTPlib error ##### {e} ######################## ".format(e=e, url=url))
         if random_proxy:  # remove proxy from the list if needed
-            failed_proxy(random_proxy)
+            proxies_list.failed_proxy(random_proxy)
         logger.warning("Failed to download the page because of other HTTPlib error proxy error: {0}".format(url))
         logger.error(traceback.format_exc())
         res = {'loop_server': True}
@@ -1034,6 +975,7 @@ def __download_url__(url, session, random_proxy):
 
 
 def download_url(url, data=None, cookie=None, wait=0, throttler=(None, None)):
+    global proxies_list
     # let's not recurse where exceptions can raise exceptions can raise exceptions can...
     response = None
     loop_client = 0
@@ -1049,9 +991,11 @@ def download_url(url, data=None, cookie=None, wait=0, throttler=(None, None)):
                 throttler[1].acquire()
                 logger.debug("download_url: permission to download granted")
             session = requests.Session()
-            random_proxy = get_random_proxy()
-            if random_proxy:
-                session.proxies = {'http': random_proxy}
+            random_proxy = None
+            if proxies_list:
+                random_proxy = proxies_list.get_random_proxy()
+                if random_proxy:
+                    session.proxies = {'http': random_proxy}
             user_agent = get_random_user_agent()
             session.headers.update({'User-Agent': user_agent, 'Accept-Charset': 'utf-8'})
             if cookie:
@@ -1534,6 +1478,7 @@ class Sqlite3Storage(PastieStorage):
 
 def parse_config_file(configfile, debug):
     global yamlconfig
+    global proxies_list
     try:
         yamlconfig = yaml.load(open(configfile), Loader=yaml.FullLoader)
     except yaml.YAMLError as exc:
@@ -1551,7 +1496,7 @@ def parse_config_file(configfile, debug):
     for includes in yamlconfig.get("includes", []):
         yamlconfig.update(yaml.load(open(includes)))
     if yamlconfig['proxy']['random']:
-        load_proxies_from_file(yamlconfig['proxy']['file'])
+        proxies_list = ProxyList(yamlconfig['proxy']['file'])
     if yamlconfig['user-agent']['random']:
         load_user_agents_from_file(yamlconfig['user-agent']['file'])
 
@@ -1692,7 +1637,6 @@ def main_as_daemon(storage_engines):
 
     logger.info('Starting up ...')
     main(storage_engines)
-
 
 if __name__ == "__main__":
     global logger
