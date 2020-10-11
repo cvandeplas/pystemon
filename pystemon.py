@@ -970,6 +970,15 @@ def __parse_http__(url, session, random_proxy):
             htmlPage = e.read()
             logger.warning("504 from proxy received for {url}".format(url=url))
             res = {'loop_server': True, 'wait': 60}
+        elif 429 == e.code:
+            retry_after = response.headers.get('Retry-After', 60)
+            if retry_after.isdigit():
+                wait = int(retry_after)
+                logger.warning("429 from proxy received for {url} requesting Retry-After {wait} seconds".format(url=url, wait=wait))
+            else:
+                logger.warning("429 from proxy received for {url}".format(url=url))
+                wait = 60
+            res = {'loop_server': True, 'wait': wait}
         elif 502 == e.code:
             htmlPage = e.read()
             logger.warning("502 from proxy received for {url}".format(url=url))
