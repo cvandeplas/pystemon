@@ -83,11 +83,10 @@ def make_bound_socket(source_ip):
         return sock
     return bound_socket
 
-
 class PastieSite(threading.Thread):
     '''
     Instances of these threads are responsible for downloading the list of
-    the most recent pastes and added those to the download queue.
+    the most recent pastes and add them to the download queue.
     '''
 
     def __init__(self, name, download_url, archive_url, archive_regex, **kwargs):
@@ -126,6 +125,7 @@ class PastieSite(threading.Thread):
         self.archive_compress = kwargs.get('archive_compress', False)
         self.update_min = kwargs['site_update_min']
         self.update_max = kwargs['site_update_max']
+        self.throttler = (kwargs.get('site_throttler', None), threading.Lock())
         self.pastie_classname = kwargs['site_pastie_classname']
         self.seen_pasties = deque('', 1000)  # max number of pasties ids in memory
         self.storage = None
@@ -144,7 +144,6 @@ class PastieSite(threading.Thread):
                 # so we first have the old entries and then the new ones
                 last_pasties = self.get_last_pasties()
                 if last_pasties:
-                    # self.__toto__(last_pasties)
                     amount = len(last_pasties)
                     while last_pasties:
                         pastie = last_pasties.pop()
@@ -177,7 +176,7 @@ class PastieSite(threading.Thread):
         # reset the pasties list
         pasties = []
         # populate queue with data
-        response = download_url(self.archive_url)
+        response = download_url(self.archive_url, throttler=self.throttler)
         if not response:
             logger.warning("Failed to download page {url}".format(url=self.archive_url))
             return False
@@ -258,6 +257,7 @@ class Pastie():
         if self.site.metadata_url is not None:
             self.metadata_url = self.site.metadata_url.format(id=self.id)
         self.filename = self.site.pastie_id_to_filename(self.id)
+        self.throttler = self.site.throttler
 
     def hash_pastie(self):
         if self.pastie_content:
@@ -269,11 +269,11 @@ class Pastie():
 
     def fetch_pastie(self):
         if self.metadata_url is not None:
-            response = download_url(self.metadata_url)
+            response = download_url(self.metadata_url, throttler=self.throttler)
             if response is not None:
                 response = response.content
                 self.pastie_metadata = response
-        response = download_url(self.url)
+        response = download_url(self.url, throttler=self.throttler)
         if response is not None:
             response = response.content
             self.pastie_content = response
@@ -439,7 +439,7 @@ class PastieBerylia(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = download_url(self.url)
+        response = download_url(self.url, throttler=self.throttler)
         downloaded_page = response.text
         if downloaded_page:
             # convert to json object
@@ -460,7 +460,7 @@ class PastiePasteOrgRu(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = download_url(self.url)
+        response = download_url(self.url, throttler=self.throttler)
         if response.text:
             htmlDom = BeautifulSoup(response.text, 'lxml')
             if not htmlDom:
@@ -480,7 +480,7 @@ class PastiePasteSiteCom(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = download_url(self.url)
+        response = download_url(self.url, throttler=self.throttler)
         validation_form_page = response.text
         if validation_form_page:
             htmlDom = BeautifulSoup(validation_form_page, 'lxml')
@@ -493,7 +493,7 @@ class PastiePasteSiteCom(Pastie):
             # build a form with plainConfirm = value (the cookie remains in the requests session)
             data = urlencode({'plainConfirm': plain_confirm})
             url = "http://pastesite.com/plain/{id}".format(id=self.id)
-            response2 = download_url(url, data)
+            response2 = download_url(url, data=data, throttler=self.throttler)
             self.pastie_content = response2
         return self.pastie_content
 
@@ -509,7 +509,7 @@ class PastieSlexyOrg(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = download_url(self.url)
+        response = download_url(self.url, throttler=self.throttler)
         validation_form_page = response.text
         if validation_form_page:
             htmlDom = BeautifulSoup(validation_form_page, 'lxml')
@@ -519,7 +519,7 @@ class PastieSlexyOrg(Pastie):
             if not a:
                 return self.pastie_content
             url = "https://slexy.org{}".format(a['href'])
-            response2 = download_url(url)
+            response2 = download_url(url, throttler=self.throttler)
             self.pastie_content = response2.content
         return self.pastie_content
 
@@ -535,7 +535,7 @@ class PastieCdvLt(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = download_url(self.url)
+        response = download_url(self.url, throttler=self.throttler)
         downloaded_page = response.text
         if downloaded_page:
             # convert to json object
@@ -557,7 +557,7 @@ class PastieSniptNet(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = download_url(self.url)
+        response = download_url(self.url, throttler=self.throttler)
         downloaded_page = response.text
         if downloaded_page:
             htmlDom = BeautifulSoup(downloaded_page)
@@ -571,17 +571,17 @@ class PastieSniptNet(Pastie):
                 self.pastie_content = decoded.contents[0]
         return self.pastie_content
 
-
 class ThreadPasties(threading.Thread):
     '''
     Instances of these threads are responsible for downloading the pastes
     found in the queue.
     '''
 
-    def __init__(self, queue, queue_name):
+    def __init__(self, queue=None, queue_name=None, throttler=None):
         threading.Thread.__init__(self)
         self.queue = queue
         self.name = queue_name
+        self.throttler = throttler
         self.kill_received = False
 
     def run(self):
@@ -604,6 +604,29 @@ class ThreadPasties(threading.Thread):
                 # signals to queue job is done
                 self.queue.task_done()
 
+class ThreadThrottler(threading.Thread):
+
+    def __init__(self, site, throttling):
+        threading.Thread.__init__(self)
+        self.site = site
+        self.throttling = throttling
+        self.queue = Queue()
+        self.kill_received = False
+
+    def release(self, url):
+        self.queue.put(url)
+
+    def run(self):
+        queue = self.queue
+        throttling = self.throttling
+        site = self.site
+        while not self.kill_received:
+            logger.debug("ThreadThrottler[{}]: waiting for a download request ...".format(site))
+            consumer_lock = queue.get()
+            logger.debug("ThreadThrottler[{}]: releasing download request".format(site))
+            consumer_lock.release()
+            logger.debug("ThreadThrottler[{}]: now waiting {} millisecond(s) ...".format(site, throttling))
+            time.sleep(throttling/float(1000))
 
 class PastieSearch():
     def __init__(self, regex):
@@ -771,34 +794,53 @@ def main(storage_engines):
         else:
             logger.warning("Site: {} is not enabled or disabled in config file. We just assume it disabled.".format(site))
 
-    # spawn a pool of threads per PastieSite, and pass them a queue instance
+    '''
+     for each site enabled:
+     - get the configuration
+     - if successfull, create a queue
+     - create a thread to refresh the list of pasties to download (consumer)
+     - create a thread to download the pasties (consumer)
+     - if needed, create a thread to throttle all the other threads (producer)
+    '''
     for site in sites_enabled:
-        queues[site] = Queue()
-        for i in range(yamlconfig['threads']):
-            t = ThreadPasties(queues[site], site)
-            threads.append(t)
-            t.setDaemon(True)
-            t.start()
-
-    # build threads to download the last pasties
-    for site_name in sites_enabled:
         try:
-            site_download_url = yamlconfig['site'][site_name]['download-url']
-            site_archive_url = yamlconfig['site'][site_name]['archive-url']
-            site_archive_regex = yamlconfig['site'][site_name]['archive-regex']
-            t = PastieSite(site_name, site_download_url, site_archive_url, site_archive_regex,
-                           site_public_url=yamlconfig['site'][site_name].get('public-url'),
-                           site_metadata_url=yamlconfig['site'][site_name].get('metadata-url'),
-                           site_update_min=yamlconfig['site'][site_name].get('update-min', 10),
-                           site_update_max=yamlconfig['site'][site_name].get('update-max', 30),
-                           site_pastie_classname=yamlconfig['site'][site_name].get('pastie-classname'),
+
+            site_download_url = yamlconfig['site'][site]['download-url']
+            site_archive_url = yamlconfig['site'][site]['archive-url']
+            site_archive_regex = yamlconfig['site'][site]['archive-regex']
+            site_throttling = yamlconfig['site'][site].get('throttling', 0)
+
+            throttler = None
+            if site_throttling > 0:
+                logger.debug("enabling throttling on site {site}".format(site=site))
+                throttler = ThreadThrottler(site, site_throttling)
+                threads.append(throttler)
+                throttler.setDaemon(True)
+                throttler.start()
+
+            queues[site] = Queue()
+
+            for i in range(yamlconfig['threads']):
+                t = ThreadPasties(queue_name=site, queue=queues[site], throttler=throttler)
+                threads.append(t)
+                t.setDaemon(True)
+                t.start()
+
+            t = PastieSite(site, site_download_url, site_archive_url, site_archive_regex,
+                           site_public_url=yamlconfig['site'][site].get('public-url'),
+                           site_metadata_url=yamlconfig['site'][site].get('metadata-url'),
+                           site_update_min=yamlconfig['site'][site].get('update-min', 10),
+                           site_update_max=yamlconfig['site'][site].get('update-max', 30),
+                           site_pastie_classname=yamlconfig['site'][site].get('pastie-classname'),
                            site_save_dir=yamlconfig['archive'].get('dir'),
                            site_archive_dir=yamlconfig['archive'].get('dir-all'),
+                           site_throttler=throttler,
                            archive_compress=yamlconfig['archive'].get('compress', False))
             t.set_storage(storage)
             threads.append(t)
             t.setDaemon(True)
             t.start()
+
         except Exception as e:
             logger.error('Unable to initialize pastie site {0}: {1}'.format(site_name, e))
 
@@ -982,14 +1024,21 @@ def __download_url__(url, session, random_proxy):
     return res
 
 
-def download_url(url, data=None, cookie=None):
+def download_url(url, data=None, cookie=None, wait=0, throttler=(None, None)):
     # let's not recurse where exceptions can raise exceptions can raise exceptions can...
     response = None
     loop_client = 0
     loop_server = 0
-    wait = 0
     while (response is None) and (loop_client < retries_client) and (loop_server < retries_server):
         try:
+            if throttler[0] is not None:
+                # wake up the throttler
+                logger.debug("download_url: throttling enabled, waking up throttler ...")
+                throttler[0].release(throttler[1])
+                # wait until the throttler allows us to download
+                logger.debug("download_url: waiting for permission to download ...")
+                throttler[1].acquire()
+                logger.debug("download_url: permission to download granted")
             session = requests.Session()
             random_proxy = get_random_proxy()
             if random_proxy:
@@ -1021,7 +1070,7 @@ def download_url(url, data=None, cookie=None):
             loop_client += 1
         if res.get('loop_server', False):
             loop_server += 1
-        wait = res.get('wait', 0)
+        wait = res.get('wait', wait)
 
     if response is None:
         # Client errors (40x): if more than 5 recursions, give up on URL (used for 404 case)
