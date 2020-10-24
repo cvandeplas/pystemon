@@ -11,8 +11,6 @@ class ThreadProxyList(threading.Thread):
     Threaded file listener for proxy list file. Modification to the file results
     in updating the proxy list.
     '''
-    global proxies_list
-
     def __init__(self, proxies_list, wait=1):
         threading.Thread.__init__(self)
         self.list = proxies_list

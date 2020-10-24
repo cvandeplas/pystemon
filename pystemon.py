@@ -48,8 +48,9 @@ import threading
 # LATER: multiprocessing to parse regex
 import time
 from io import open
-import requests
 from pastie.proxy import ProxyList
+from pastie.ua import PystemonUA
+from pastie.throttler import ThreadThrottler
 
 try:
     from urllib.error import HTTPError, URLError
@@ -71,14 +72,13 @@ try:
 except Exception:
     exit('You need python version 2.7 or newer.')
 
-retries_client = 5
-retries_server = 100
-
 socket.setdefaulttimeout(10)  # set a default timeout of 10 seconds to download the page (default = unlimited)
 true_socket = socket.socket
 
 global proxies_list
 proxies_list = None
+global user_agents_list
+user_agents_list = []
 
 def make_bound_socket(source_ip):
     def bound_socket(*a, **k):
@@ -129,7 +129,8 @@ class PastieSite(threading.Thread):
         self.archive_compress = kwargs.get('archive_compress', False)
         self.update_min = kwargs['site_update_min']
         self.update_max = kwargs['site_update_max']
-        self.throttler = (kwargs.get('site_throttler', None), threading.Lock())
+        self.throttler = kwargs.get('site_throttler', None)
+        self.ua = kwargs.get('site_ua', PystemonUA([]))
         self.pastie_classname = kwargs['site_pastie_classname']
         self.seen_pasties = deque('', 1000)  # max number of pasties ids in memory
         self.storage = None
@@ -180,7 +181,7 @@ class PastieSite(threading.Thread):
         # reset the pasties list
         pasties = []
         # populate queue with data
-        response = download_url(self.archive_url, throttler=self.throttler)
+        response = self.ua.download_url(self.archive_url, throttler=self.throttler)
         if not response:
             logger.warning("Failed to download page {url}".format(url=self.archive_url))
             return False
@@ -256,6 +257,7 @@ class Pastie():
         self.matched = False
         self.md5 = None
         self.url = self.site.download_url.format(id=self.id)
+        self.ua = self.site.ua
         self.public_url = self.site.public_url.format(id=self.id)
         self.metadata_url = None
         if self.site.metadata_url is not None:
@@ -273,11 +275,11 @@ class Pastie():
 
     def fetch_pastie(self):
         if self.metadata_url is not None:
-            response = download_url(self.metadata_url, throttler=self.throttler)
+            response = self.ua.download_url(self.metadata_url, throttler=self.throttler)
             if response is not None:
                 response = response.content
                 self.pastie_metadata = response
-        response = download_url(self.url, throttler=self.throttler)
+        response = self.ua.download_url(self.url, throttler=self.throttler)
         if response is not None:
             response = response.content
             self.pastie_content = response
@@ -443,7 +445,7 @@ class PastieBerylia(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = download_url(self.url, throttler=self.throttler)
+        response = self.ua.download_url(self.url, throttler=self.throttler)
         downloaded_page = response.text
         if downloaded_page:
             # convert to json object
@@ -464,7 +466,7 @@ class PastiePasteOrgRu(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = download_url(self.url, throttler=self.throttler)
+        response = self.ua.download_url(self.url, throttler=self.throttler)
         if response.text:
             htmlDom = BeautifulSoup(response.text, 'lxml')
             if not htmlDom:
@@ -484,7 +486,7 @@ class PastiePasteSiteCom(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = download_url(self.url, throttler=self.throttler)
+        response = self.ua.download_url(self.url, throttler=self.throttler)
         validation_form_page = response.text
         if validation_form_page:
             htmlDom = BeautifulSoup(validation_form_page, 'lxml')
@@ -497,7 +499,7 @@ class PastiePasteSiteCom(Pastie):
             # build a form with plainConfirm = value (the cookie remains in the requests session)
             data = urlencode({'plainConfirm': plain_confirm})
             url = "http://pastesite.com/plain/{id}".format(id=self.id)
-            response2 = download_url(url, data=data, throttler=self.throttler)
+            response2 = self.ua.download_url(url, data=data, throttler=self.throttler)
             self.pastie_content = response2
         return self.pastie_content
 
@@ -513,7 +515,7 @@ class PastieSlexyOrg(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = download_url(self.url, throttler=self.throttler)
+        response = self.ua.download_url(self.url, throttler=self.throttler)
         validation_form_page = response.text
         if validation_form_page:
             htmlDom = BeautifulSoup(validation_form_page, 'lxml')
@@ -523,7 +525,7 @@ class PastieSlexyOrg(Pastie):
             if not a:
                 return self.pastie_content
             url = "https://slexy.org{}".format(a['href'])
-            response2 = download_url(url, throttler=self.throttler)
+            response2 = self.ua.download_url(url, throttler=self.throttler)
             self.pastie_content = response2.content
         return self.pastie_content
 
@@ -539,7 +541,7 @@ class PastieCdvLt(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = download_url(self.url, throttler=self.throttler)
+        response = self.ua.download_url(self.url, throttler=self.throttler)
         downloaded_page = response.text
         if downloaded_page:
             # convert to json object
@@ -561,7 +563,7 @@ class PastieSniptNet(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = download_url(self.url, throttler=self.throttler)
+        response = self.ua.download_url(self.url, throttler=self.throttler)
         downloaded_page = response.text
         if downloaded_page:
             htmlDom = BeautifulSoup(downloaded_page)
@@ -607,30 +609,6 @@ class ThreadPasties(threading.Thread):
                 del(pastie)
                 # signals to queue job is done
                 self.queue.task_done()
-
-class ThreadThrottler(threading.Thread):
-
-    def __init__(self, site, throttling):
-        threading.Thread.__init__(self)
-        self.site = site
-        self.throttling = throttling
-        self.queue = Queue()
-        self.kill_received = False
-
-    def release(self, url):
-        self.queue.put(url)
-
-    def run(self):
-        queue = self.queue
-        throttling = self.throttling
-        site = self.site
-        while not self.kill_received:
-            logger.debug("ThreadThrottler[{}]: waiting for a download request ...".format(site))
-            consumer_lock = queue.get()
-            logger.debug("ThreadThrottler[{}]: releasing download request".format(site))
-            consumer_lock.release()
-            logger.debug("ThreadThrottler[{}]: now waiting {} millisecond(s) ...".format(site, throttling))
-            time.sleep(throttling/float(1000))
 
 class PastieSearch():
     def __init__(self, regex):
@@ -715,327 +693,6 @@ class PastieSearch():
                 self.h[k] = v
         return self.h
 
-
-def cleanup(signal, frame):
-    global threads
-    for t in threads:
-        t.kill_received = True
-
-def main(storage_engines):
-    global queues
-    global threads
-    global patterns
-    global proxies_list
-    queues = {}
-    threads = []
-    patterns = []
-
-    # load the regular expression engine
-    engine = yamlconfig.get('engine', 're')
-    if engine == 're':
-        import re
-    elif engine == 'regex':
-        try:
-            global re
-            logger.debug("Loading alternative 'regex' engine ...")
-            import regex as re
-            re.DEFAULT_VERSION = re.VERSION1
-            logger.debug("Successfully loaded 'regex' engine")
-        except ImportError as e:
-            exit("ERROR: Unable to import 'regex' engine: %s" % e)
-    else:
-        exit("ERROR: Invalid regex engine '%s' specified" % engine)
-
-    # compile all search patterns
-    strict = yamlconfig.get('strict_regex', False)
-    for regex in yamlconfig['search']:
-        try:
-            search = regex['search']
-            ps = PastieSearch(regex)
-            patterns.append(ps)
-        except KeyError:
-            if strict:
-                exit("Error: Missing search pattern")
-            else:
-                logger.error("Error: skipping empty search pattern entry")
-        except Exception as e:
-            if strict:
-                exit("Error: Unable to parse regex '%s': %s" % (search, e))
-            else:
-                logger.error("Error: Unable to parse regex '%s': %s" % (search, e))
-
-    # start thread for proxy file listener
-    if yamlconfig['proxy']['random']:
-        t = proxies_list.monitor()
-        threads.append(t)
-
-    save_thread = yamlconfig.get('save-thread', False)
-    storage = StorageDispatcher()
-    if storage_engines:
-        if save_thread:
-            logger.info("Pasties will be saved asynchronously")
-        else:
-            logger.info("Pasties will be saved synchronously")
-    else:
-        logger.info("Pasties will not be saved")
-    for db in storage_engines:
-        # start the threads handling database storage if needed
-        if save_thread:
-            t = StorageThread(db)
-            threads.append(t)
-            storage.add_storage(t)
-            t.setDaemon(True)
-            t.start()
-        # save pasties synchronously
-        else:
-            s = StorageSync(db)
-            storage.add_storage(s)
-
-    # Build array of enabled sites.
-    sites_enabled = []
-    for site in yamlconfig['site']:
-        if yamlconfig['site'][site].get('enable'):
-            logger.info("Site: {} is enabled, adding to pool...".format(site))
-            sites_enabled.append(site)
-        elif yamlconfig['site'][site].get('enable') is False:
-            logger.info("Site: {} is disabled.".format(site))
-        else:
-            logger.warning("Site: {} is not enabled or disabled in config file. We just assume it disabled.".format(site))
-
-    '''
-     for each site enabled:
-     - get the configuration
-     - if successfull, create a queue
-     - create a thread to refresh the list of pasties to download (consumer)
-     - create a thread to download the pasties (consumer)
-     - if needed, create a thread to throttle all the other threads (producer)
-    '''
-    for site in sites_enabled:
-        try:
-
-            site_download_url = yamlconfig['site'][site]['download-url']
-            site_archive_url = yamlconfig['site'][site]['archive-url']
-            site_archive_regex = yamlconfig['site'][site]['archive-regex']
-            site_throttling = yamlconfig['site'][site].get('throttling', 0)
-
-            throttler = None
-            if site_throttling > 0:
-                logger.debug("enabling throttling on site {site}".format(site=site))
-                throttler = ThreadThrottler(site, site_throttling)
-                threads.append(throttler)
-                throttler.setDaemon(True)
-                throttler.start()
-
-            queues[site] = Queue()
-
-            for i in range(yamlconfig['threads']):
-                t = ThreadPasties(queue_name=site, queue=queues[site], throttler=throttler)
-                threads.append(t)
-                t.setDaemon(True)
-                t.start()
-
-            t = PastieSite(site, site_download_url, site_archive_url, site_archive_regex,
-                           site_public_url=yamlconfig['site'][site].get('public-url'),
-                           site_metadata_url=yamlconfig['site'][site].get('metadata-url'),
-                           site_update_min=yamlconfig['site'][site].get('update-min', 10),
-                           site_update_max=yamlconfig['site'][site].get('update-max', 30),
-                           site_pastie_classname=yamlconfig['site'][site].get('pastie-classname'),
-                           site_save_dir=yamlconfig['archive'].get('dir'),
-                           site_archive_dir=yamlconfig['archive'].get('dir-all'),
-                           site_throttler=throttler,
-                           archive_compress=yamlconfig['archive'].get('compress', False))
-            t.set_storage(storage)
-            threads.append(t)
-            t.setDaemon(True)
-            t.start()
-
-        except Exception as e:
-            logger.error('Unable to initialize pastie site {0}: {1}'.format(site_name, e))
-
-    signal.signal(signal.SIGTERM, cleanup)
-    # wait while all the threads are running and someone sends CTRL+C
-    while True:
-        try:
-            for t in threads:
-                t.join(1)
-        except KeyboardInterrupt:
-            print('')
-            print("Ctrl-c received! Sending kill to threads...")
-            for t in threads:
-                t.kill_received = True
-            logger.info('exiting')
-            exit(0)  # quit immediately
-
-
-user_agents_list = []
-
-
-def load_user_agents_from_file(filename):
-    global user_agents_list
-    try:
-        f = open(filename)
-    except Exception as e:
-        logger.error('Configuration problem: user-agent-file "{file}" not found or not readable: {e}'.format(file=filename, e=e))
-    for line in f:
-        line = line.strip()
-        if line:
-            user_agents_list.append(line)
-    logger.debug('Found {count} UserAgents in file "{file}"'.format(file=filename, count=len(user_agents_list)))
-
-
-def get_random_user_agent():
-    global user_agents_list
-    if user_agents_list:
-        return random.choice(user_agents_list)
-    return 'Python-urllib/2.7'
-
-def __parse_http__(url, session, random_proxy):
-    global proxies_list
-    try:
-        response = session.get(url, stream=True)
-        response.raise_for_status()
-        res = {'response': response}
-    except HTTPError as e:
-        proxies_list.failed_proxy(random_proxy)
-        logger.warning("!!Proxy error on {0}.".format(url))
-        if 404 == e.code:
-            htmlPage = e.read()
-            logger.warning("404 from proxy received for {url}".format(url=url))
-            res = {'loop_client': True, 'wait': 60}
-        elif 500 == e.code:
-            htmlPage = e.read()
-            logger.warning("500 from proxy received for {url}".format(url=url))
-            res = {'loop_server': True, 'wait': 60}
-        elif 504 == e.code:
-            htmlPage = e.read()
-            logger.warning("504 from proxy received for {url}".format(url=url))
-            res = {'loop_server': True, 'wait': 60}
-        elif 429 == e.code:
-            retry_after = response.headers.get('Retry-After', 60)
-            if retry_after.isdigit():
-                wait = int(retry_after)
-                logger.warning("429 from proxy received for {url} requesting Retry-After {wait} seconds".format(url=url, wait=wait))
-            else:
-                logger.warning("429 from proxy received for {url}".format(url=url))
-                wait = 60
-            res = {'loop_server': True, 'wait': wait}
-        elif 502 == e.code:
-            htmlPage = e.read()
-            logger.warning("502 from proxy received for {url}".format(url=url))
-            res = {'loop_server': True, 'wait': 60}
-        elif 403 == e.code:
-            htmlPage = e.read()
-            if 'Please slow down' in htmlPage or 'has temporarily blocked your computer' in htmlPage or 'blocked' in htmlPage:
-                logger.warning("Slow down message received for {url}".format(url=url))
-                res = {'loop_server': True, 'wait': 60}
-            else:
-                logger.warning("403 from proxy received for {url}, aborting".format(url=url))
-                res = {'abort': True}
-        else:
-            logger.warning("ERROR: HTTP Error ##### {e} ######################## {url}".format(e=e, url=url))
-            res = {'abort': True}
-    return res
-
-
-def __download_url__(url, session, random_proxy):
-    global proxies_list
-    try:
-        res = __parse_http__(url, session, random_proxy)
-    except URLError as e:
-        logger.debug("ERROR: URL Error ##### {e} ######################## ".format(e=e, url=url))
-        if random_proxy:  # remove proxy from the list if needed
-            proxies_list.failed_proxy(random_proxy)
-            logger.warning("Failed to download the page because of proxy error: {0}".format(url))
-            res = {'loop_server': True}
-        elif 'timed out' in e.reason:
-            logger.warning("Timed out or slow down for {url}".format(url=url))
-            res = {'loop_server': True, 'wait': 60}
-    except socket.timeout as e:
-        logger.debug("ERROR: timeout ##### {e} ######################## ".format(e=e, url=url))
-        if random_proxy:  # remove proxy from the list if needed
-            proxies_list.failed_proxy(random_proxy)
-            logger.warning("Failed to download the page because of socket error {0}:".format(url))
-            res = {'loop_server': True}
-    except requests.ConnectionError as e:
-        logger.debug("ERROR: connection failed ##### {e} ######################## ".format(e=e, url=url))
-        if random_proxy:  # remove proxy from the list if needed
-            proxies_list.failed_proxy(random_proxy)
-        logger.warning("Failed to download the page because of connection error: {0}".format(url))
-        logger.error(traceback.format_exc())
-        res = {'loop_server': True, 'wait': 60}
-    except Exception as e:
-        logger.debug("ERROR: Other HTTPlib error ##### {e} ######################## ".format(e=e, url=url))
-        if random_proxy:  # remove proxy from the list if needed
-            proxies_list.failed_proxy(random_proxy)
-        logger.warning("Failed to download the page because of other HTTPlib error proxy error: {0}".format(url))
-        logger.error(traceback.format_exc())
-        res = {'loop_server': True}
-    # do NOT try to download the url again here, as we might end in enless loop
-    return res
-
-
-def download_url(url, data=None, cookie=None, wait=0, throttler=(None, None)):
-    global proxies_list
-    # let's not recurse where exceptions can raise exceptions can raise exceptions can...
-    response = None
-    loop_client = 0
-    loop_server = 0
-    while (response is None) and (loop_client < retries_client) and (loop_server < retries_server):
-        try:
-            if throttler[0] is not None:
-                # wake up the throttler
-                logger.debug("download_url: throttling enabled, waking up throttler ...")
-                throttler[0].release(throttler[1])
-                # wait until the throttler allows us to download
-                logger.debug("download_url: waiting for permission to download ...")
-                throttler[1].acquire()
-                logger.debug("download_url: permission to download granted")
-            session = requests.Session()
-            random_proxy = None
-            if proxies_list:
-                random_proxy = proxies_list.get_random_proxy()
-                if random_proxy:
-                    session.proxies = {'http': random_proxy}
-            user_agent = get_random_user_agent()
-            session.headers.update({'User-Agent': user_agent, 'Accept-Charset': 'utf-8'})
-            if cookie:
-                session.headers.update({'Cookie': cookie})
-            if data:
-                session.headers.update(data)
-        except Exception as e:
-            logger.error("ERROR: unable to initialize session, aborting: {0}".format(e))
-            return None
-        if wait > 0:
-            logger.debug("Waiting {s}s before retrying {url}".format(s=wait, url=url))
-            time.sleep(wait)
-        logger.debug('Downloading url: {url} with proxy: {proxy} and user-agent: {ua}'.format(url=url, proxy=random_proxy, ua=user_agent))
-        if (loop_client > 0) or (loop_server > 0):
-            logger.warning("Retry client={lc}/{tc}, server={ls}/{ts} for {url}".format(
-                lc=loop_client, tc=retries_client,
-                ls=loop_server, ts=retries_server,
-                url=url
-            ))
-        res = __download_url__(url, session, random_proxy)
-        response = res.get('response', None)
-        if res.get('abort', False):
-            break
-        if res.get('loop_client', False):
-            loop_client += 1
-        if res.get('loop_server', False):
-            loop_server += 1
-        wait = res.get('wait', wait)
-
-    if response is None:
-        # Client errors (40x): if more than 5 recursions, give up on URL (used for 404 case)
-        if loop_client >= retries_client:
-            logger.error("ERROR: too many client errors, giving up on {0}".format(url))
-        # Server errors (50x): if more than 100 recursions, give up on URL
-        elif loop_server >= retries_server:
-            logger.error("ERROR: too many server errors, giving up on {0}".format(url))
-        else:
-            logger.error("ERROR: too many errors, giving up on {0}".format(url))
-
-    return response
 
 
 class StorageScheduler():
@@ -1476,6 +1133,22 @@ class Sqlite3Storage(PastieStorage):
         logger.debug('Updated pastie {site} {id} in the SQLite database.'.format(site=pastie.site.name, id=pastie.id))
 
 
+def load_user_agents_from_file(filename):
+    global user_agents_list
+    try:
+        ualist = []
+        logger.debug('Loading user-agent from file "{file}" ...'.format(file=filename))
+        with open(filename) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    ualist.append(line)
+        logger.debug('Found {count} UserAgents in file "{file}"'.format(file=filename, count=len(ualist)))
+        user_agents_list = ualist
+    except Exception as e:
+        logger.error('Configuration problem: user-agent-file "{file}" not found or not readable: {e}'.format(file=filename, e=e))
+        pass
+
 def parse_config_file(configfile, debug):
     global yamlconfig
     global proxies_list
@@ -1616,6 +1289,160 @@ def parse_config_file(configfile, debug):
         exit('ERROR: Unable to initialize mongo storage: {0}'.format(e))
 
     return storage_engines
+
+
+def cleanup(signal, frame):
+    global threads
+    for t in threads:
+        t.kill_received = True
+
+def main(storage_engines):
+    global queues
+    global threads
+    global patterns
+    global proxies_list
+    global user_agents_list
+    queues = {}
+    threads = []
+    patterns = []
+
+    # load the regular expression engine
+    engine = yamlconfig.get('engine', 're')
+    if engine == 're':
+        import re
+    elif engine == 'regex':
+        try:
+            global re
+            logger.debug("Loading alternative 'regex' engine ...")
+            import regex as re
+            re.DEFAULT_VERSION = re.VERSION1
+            logger.debug("Successfully loaded 'regex' engine")
+        except ImportError as e:
+            exit("ERROR: Unable to import 'regex' engine: %s" % e)
+    else:
+        exit("ERROR: Invalid regex engine '%s' specified" % engine)
+
+    # compile all search patterns
+    strict = yamlconfig.get('strict_regex', False)
+    for regex in yamlconfig['search']:
+        try:
+            search = regex['search']
+            ps = PastieSearch(regex)
+            patterns.append(ps)
+        except KeyError:
+            if strict:
+                exit("Error: Missing search pattern")
+            else:
+                logger.error("Error: skipping empty search pattern entry")
+        except Exception as e:
+            if strict:
+                exit("Error: Unable to parse regex '%s': %s" % (search, e))
+            else:
+                logger.error("Error: Unable to parse regex '%s': %s" % (search, e))
+
+    # start thread for proxy file listener
+    if yamlconfig['proxy']['random']:
+        t = proxies_list.monitor()
+        threads.append(t)
+
+    save_thread = yamlconfig.get('save-thread', False)
+    storage = StorageDispatcher()
+    if storage_engines:
+        if save_thread:
+            logger.info("Pasties will be saved asynchronously")
+        else:
+            logger.info("Pasties will be saved synchronously")
+    else:
+        logger.info("Pasties will not be saved")
+    for db in storage_engines:
+        # start the threads handling database storage if needed
+        if save_thread:
+            t = StorageThread(db)
+            threads.append(t)
+            storage.add_storage(t)
+            t.setDaemon(True)
+            t.start()
+        # save pasties synchronously
+        else:
+            s = StorageSync(db)
+            storage.add_storage(s)
+
+    # Build array of enabled sites.
+    sites_enabled = []
+    for site in yamlconfig['site']:
+        if yamlconfig['site'][site].get('enable'):
+            logger.info("Site: {} is enabled, adding to pool...".format(site))
+            sites_enabled.append(site)
+        elif yamlconfig['site'][site].get('enable') is False:
+            logger.info("Site: {} is disabled.".format(site))
+        else:
+            logger.warning("Site: {} is not enabled or disabled in config file. We just assume it disabled.".format(site))
+
+    '''
+     for each site enabled:
+     - get the configuration
+     - if successfull, create a queue
+     - create a thread to refresh the list of pasties to download (consumer)
+     - create a thread to download the pasties (consumer)
+     - if needed, create a thread to throttle all the other threads (producer)
+    '''
+    for site in sites_enabled:
+        try:
+
+            site_download_url = yamlconfig['site'][site]['download-url']
+            site_archive_url = yamlconfig['site'][site]['archive-url']
+            site_archive_regex = yamlconfig['site'][site]['archive-regex']
+            site_throttling = yamlconfig['site'][site].get('throttling', 0)
+
+            throttler = None
+            if site_throttling > 0:
+                logger.debug("enabling throttling on site {site}".format(site=site))
+                throttler = ThreadThrottler(site, site_throttling)
+                threads.append(throttler)
+                throttler.setDaemon(True)
+                throttler.start()
+
+            queues[site] = Queue()
+
+            for i in range(yamlconfig['threads']):
+                t = ThreadPasties(queue_name=site, queue=queues[site], throttler=throttler)
+                threads.append(t)
+                t.setDaemon(True)
+                t.start()
+
+            t = PastieSite(site, site_download_url, site_archive_url, site_archive_regex,
+                           site_public_url=yamlconfig['site'][site].get('public-url'),
+                           site_metadata_url=yamlconfig['site'][site].get('metadata-url'),
+                           site_update_min=yamlconfig['site'][site].get('update-min', 10),
+                           site_update_max=yamlconfig['site'][site].get('update-max', 30),
+                           site_pastie_classname=yamlconfig['site'][site].get('pastie-classname'),
+                           site_save_dir=yamlconfig['archive'].get('dir'),
+                           site_archive_dir=yamlconfig['archive'].get('dir-all'),
+                           site_throttler=throttler,
+                           site_ua=PystemonUA(proxies_list, user_agents_list=user_agents_list),
+                           archive_compress=yamlconfig['archive'].get('compress', False))
+            t.set_storage(storage)
+            threads.append(t)
+            t.setDaemon(True)
+            t.start()
+
+        except Exception as e:
+            logger.error('Unable to initialize pastie site {0}: {1}'.format(site_name, e))
+
+    signal.signal(signal.SIGTERM, cleanup)
+    # wait while all the threads are running and someone sends CTRL+C
+    while True:
+        try:
+            for t in threads:
+                t.join(1)
+        except KeyboardInterrupt:
+            print('')
+            print("Ctrl-c received! Sending kill to threads...")
+            for t in threads:
+                t.kill_received = True
+            logger.info('exiting')
+            exit(0)  # quit immediately
+
 
 
 def main_as_daemon(storage_engines):
