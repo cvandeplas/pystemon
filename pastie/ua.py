@@ -3,6 +3,7 @@ import time
 import random
 import requests
 import socket
+import traceback
 
 try:
     from urllib.error import HTTPError, URLError
@@ -13,11 +14,12 @@ logger = logging.getLogger('pystemon')
 
 class PystemonUA():
 
-    def __init__(self, proxies_list, user_agents_list = [], retries_client = 5, retries_server = 100):
+    def __init__(self, proxies_list, user_agents_list = [], retries_client = 5, retries_server = 100, throttler=None):
         self.user_agents_list = user_agents_list
         self.proxies_list = proxies_list
         self.retries_client = retries_client
         self.retries_server = retries_server
+        self.throttler = throttler
 
     def get_random_user_agent(self):
         if self.user_agents_list:
@@ -109,7 +111,7 @@ class PystemonUA():
         return res
 
 
-    def download_url(self, url, data=None, cookie=None, wait=0, throttler=None):
+    def download_url(self, url, data=None, cookie=None, wait=0):
         # let's not recurse where exceptions can raise exceptions can raise exceptions can...
         response = None
         loop_client = 0
@@ -117,10 +119,10 @@ class PystemonUA():
         logger.debug("download_url: about to fetch url '{0}'".format(url))
         while (response is None) and (loop_client < self.retries_client) and (loop_server < self.retries_server):
             try:
-                if throttler is not None:
+                if self.throttler is not None:
                     # wait until the throttler allows us to download
                     logger.debug("download_url: throttling enabled, waiting for permission for download ...")
-                    throttler.wait()
+                    self.throttler.wait()
                     logger.debug("download_url: permission to download granted")
                 session = requests.Session()
                 random_proxy = None

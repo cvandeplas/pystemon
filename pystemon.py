@@ -129,8 +129,7 @@ class PastieSite(threading.Thread):
         self.archive_compress = kwargs.get('archive_compress', False)
         self.update_min = kwargs['site_update_min']
         self.update_max = kwargs['site_update_max']
-        self.throttler = kwargs.get('site_throttler', None)
-        self.ua = kwargs.get('site_ua', PystemonUA([]))
+        self.user_agent = kwargs.get('site_ua', PystemonUA([]))
         self.pastie_classname = kwargs['site_pastie_classname']
         self.seen_pasties = deque('', 1000)  # max number of pasties ids in memory
         self.storage = None
@@ -181,7 +180,7 @@ class PastieSite(threading.Thread):
         # reset the pasties list
         pasties = []
         # populate queue with data
-        response = self.ua.download_url(self.archive_url, throttler=self.throttler)
+        response = self.user_agent.download_url(self.archive_url)
         if not response:
             logger.warning("Failed to download page {url}".format(url=self.archive_url))
             return False
@@ -257,13 +256,12 @@ class Pastie():
         self.matched = False
         self.md5 = None
         self.url = self.site.download_url.format(id=self.id)
-        self.ua = self.site.ua
         self.public_url = self.site.public_url.format(id=self.id)
         self.metadata_url = None
         if self.site.metadata_url is not None:
             self.metadata_url = self.site.metadata_url.format(id=self.id)
         self.filename = self.site.pastie_id_to_filename(self.id)
-        self.throttler = self.site.throttler
+        self.user_agent = None
 
     def hash_pastie(self):
         if self.pastie_content:
@@ -273,13 +271,16 @@ class Pastie():
             except Exception as e:
                 logger.error('Pastie {site} {id} md5 problem: {e}'.format(site=self.site.name, id=self.id, e=e))
 
+    def download_url(self, url, **kwargs):
+        return self.user_agent.download_url(url, **kwargs)
+
     def fetch_pastie(self):
         if self.metadata_url is not None:
-            response = self.ua.download_url(self.metadata_url, throttler=self.throttler)
+            response = self.download_url(self.metadata_url)
             if response is not None:
                 response = response.content
                 self.pastie_metadata = response
-        response = self.ua.download_url(self.url, throttler=self.throttler)
+        response = self.download_url(self.url)
         if response is not None:
             response = response.content
             self.pastie_content = response
@@ -305,7 +306,13 @@ class Pastie():
     def save_pastie(self):
         self.site.save_pastie(self)
 
-    def fetch_and_process_pastie(self):
+    '''
+    This is the entry point of the PastieSite to download the pastie
+    To have a stable ABI, this function should save all required
+     elements in the pastie, such as the UA.
+    '''
+    def fetch_and_process_pastie(self, user_agent):
+        self.user_agent = user_agent
         # download pastie
         self.__fetch_pastie__()
         # check pastie
@@ -445,7 +452,7 @@ class PastieBerylia(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = self.ua.download_url(self.url, throttler=self.throttler)
+        response = self.download_url(self.url)
         downloaded_page = response.text
         if downloaded_page:
             # convert to json object
@@ -466,7 +473,7 @@ class PastiePasteOrgRu(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = self.ua.download_url(self.url, throttler=self.throttler)
+        response = self.download_url(self.url)
         if response.text:
             htmlDom = BeautifulSoup(response.text, 'lxml')
             if not htmlDom:
@@ -486,7 +493,7 @@ class PastiePasteSiteCom(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = self.ua.download_url(self.url, throttler=self.throttler)
+        response = self.download_url(self.url)
         validation_form_page = response.text
         if validation_form_page:
             htmlDom = BeautifulSoup(validation_form_page, 'lxml')
@@ -499,7 +506,7 @@ class PastiePasteSiteCom(Pastie):
             # build a form with plainConfirm = value (the cookie remains in the requests session)
             data = urlencode({'plainConfirm': plain_confirm})
             url = "http://pastesite.com/plain/{id}".format(id=self.id)
-            response2 = self.ua.download_url(url, data=data, throttler=self.throttler)
+            response2 = self.download_url(url, data=data)
             self.pastie_content = response2
         return self.pastie_content
 
@@ -515,7 +522,7 @@ class PastieSlexyOrg(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = self.ua.download_url(self.url, throttler=self.throttler)
+        response = self.download_url(self.url)
         validation_form_page = response.text
         if validation_form_page:
             htmlDom = BeautifulSoup(validation_form_page, 'lxml')
@@ -525,7 +532,7 @@ class PastieSlexyOrg(Pastie):
             if not a:
                 return self.pastie_content
             url = "https://slexy.org{}".format(a['href'])
-            response2 = self.ua.download_url(url, throttler=self.throttler)
+            response2 = self.download_url(url)
             self.pastie_content = response2.content
         return self.pastie_content
 
@@ -541,7 +548,7 @@ class PastieCdvLt(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = self.ua.download_url(self.url, throttler=self.throttler)
+        response = self.download_url(self.url)
         downloaded_page = response.text
         if downloaded_page:
             # convert to json object
@@ -563,7 +570,7 @@ class PastieSniptNet(Pastie):
         Pastie.__init__(self, site, pastie_id)
 
     def fetch_pastie(self):
-        response = self.ua.download_url(self.url, throttler=self.throttler)
+        response = self.download_url(self.url)
         downloaded_page = response.text
         if downloaded_page:
             htmlDom = BeautifulSoup(downloaded_page)
@@ -583,11 +590,11 @@ class ThreadPasties(threading.Thread):
     found in the queue.
     '''
 
-    def __init__(self, queue=None, queue_name=None, throttler=None):
+    def __init__(self, user_agent, queue=None, queue_name=None):
         threading.Thread.__init__(self)
+        self.user_agent = user_agent
         self.queue = queue
         self.name = queue_name
-        self.throttler = throttler
         self.kill_received = False
 
     def run(self):
@@ -595,7 +602,7 @@ class ThreadPasties(threading.Thread):
             # grabs pastie from queue
             pastie = self.queue.get()
             try:
-                pastie.fetch_and_process_pastie()
+                pastie.fetch_and_process_pastie(self.user_agent)
                 logger.debug("Queue {name} size: {size}".format(
                     size=self.queue.qsize(), name=self.name))
             # catch unknown errors
@@ -1405,7 +1412,8 @@ def main(storage_engines):
             queues[site] = Queue()
 
             for i in range(yamlconfig['threads']):
-                t = ThreadPasties(queue_name=site, queue=queues[site], throttler=throttler)
+                user_agent = PystemonUA(proxies_list, user_agents_list=user_agents_list, throttler=throttler)
+                t = ThreadPasties(user_agent, queue_name=site, queue=queues[site])
                 threads.append(t)
                 t.setDaemon(True)
                 t.start()
@@ -1418,8 +1426,7 @@ def main(storage_engines):
                            site_pastie_classname=yamlconfig['site'][site].get('pastie-classname'),
                            site_save_dir=yamlconfig['archive'].get('dir'),
                            site_archive_dir=yamlconfig['archive'].get('dir-all'),
-                           site_throttler=throttler,
-                           site_ua=PystemonUA(proxies_list, user_agents_list=user_agents_list),
+                           site_ua=PystemonUA(proxies_list, user_agents_list=user_agents_list, throttler=throttler),
                            archive_compress=yamlconfig['archive'].get('compress', False))
             t.set_storage(storage)
             threads.append(t)
@@ -1442,8 +1449,6 @@ def main(storage_engines):
                 t.kill_received = True
             logger.info('exiting')
             exit(0)  # quit immediately
-
-
 
 def main_as_daemon(storage_engines):
     try:
