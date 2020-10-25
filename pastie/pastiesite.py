@@ -50,6 +50,7 @@ class PastieSite(threading.Thread):
         self.queue = kwargs['site_queue']
         self.user_agent = kwargs.get('site_ua', PystemonUA([]))
         self.patterns = kwargs.get('patterns', [])
+        self.sendmail = kwargs.get('sendmail', None)
         try:
             self.re = kwargs['re']
         except:
@@ -102,6 +103,18 @@ class PastieSite(threading.Thread):
                 logger.error(traceback.format_exc())
             finally:
                 time.sleep(sleep_time)
+
+    def send_email_alert(self, pastie):
+        if self.sendmail is not None:
+            try:
+                logger.debug("Site[{0}]: sending email alert from pastie '{1}'".format(self.name, pastie.id))
+                self.sendmail.send_pastie_alert(pastie)
+            except Exception as e:
+                logger.error("Site[{0}]: Unable to send alert email: {1}".format(self.name, str(e)))
+                pass
+        else:
+            logger.debug("Site[{0}]: email alerts not configured".format(self.name))
+
 
     def set_storage(self, storage):
         self.storage = storage

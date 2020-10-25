@@ -21,24 +21,12 @@ except ImportError:
     from Queue import Full
     from Queue import Empty
 from datetime import datetime
-try:
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.base import MIMEBase
-    from email.mime.text import MIMEText
-    from email import encoders as Encoders
-except ImportError:
-    from email.MIMEMultipart import MIMEMultipart
-    from email.MIMEBase import MIMEBase
-    from email.MIMEText import MIMEText
-    from email import Encoders
 import gzip
 import logging.handlers
 import optparse
 import os
 import random
 import json
-import smtplib
-import socket
 import sys
 import signal
 import traceback
@@ -50,6 +38,7 @@ from pastie.proxy import ProxyList
 from pastie.ua import PystemonUA
 from pastie.throttler import ThreadThrottler
 from pastie.pastiesite import PastieSite
+from pastie.sendmail import PystemonSendmail
 
 try:
     from urllib.error import HTTPError, URLError
@@ -78,6 +67,8 @@ global user_agents_list
 user_agents_list = []
 global ip_addr
 ip_addr = ''
+global sendmail
+sendmail = None
 
 class ThreadPasties(threading.Thread):
     '''
@@ -655,6 +646,7 @@ def parse_config_file(configfile, debug):
     global yamlconfig
     global proxies_list
     global ip_addr
+    global sendmail
     try:
         yamlconfig = yaml.load(open(configfile), Loader=yaml.FullLoader)
     except yaml.YAMLError as exc:
@@ -681,6 +673,20 @@ def parse_config_file(configfile, debug):
     except:
         logger.debug("Using default IP address")
         pass
+
+    try:
+        email=yamlconfig.get('email', {})
+        if email.get('alert'):
+            sendmail = PystemonSendmail(email['from'], email['to'], email['subject'],
+                    server=email.get('server', '127.0.0.1'),
+                    port=email.get('port', 25),
+                    tls=email.get('tls', False),
+                    username=email.get('username'),
+                    password=email.get('password'),
+                    size_limit=email.get('size-limit', 1024*1024))
+            logger.debug("alert emails will be sent to '{0}' from '{1}' via '{2}'".format(sendmail.mailto, sendmail.mailfrom, sendmail.server))
+    except Exception as e:
+        logger.error("Unable to parse email configuration: {}".format(str(e)))
 
     # initialize database backends
     storage_engines = []
@@ -812,6 +818,7 @@ def main(storage_engines):
     global proxies_list
     global user_agents_list
     global ip_addr
+    global sendmail
     queues = {}
     threads = []
     patterns = []
@@ -933,6 +940,7 @@ def main(storage_engines):
                            site_ua=PystemonUA(proxies_list, user_agents_list=user_agents_list, throttler=throttler, ip_addr=ip_addr),
                            site_queue=queues[site],
                            patterns=patterns,
+                           sendmail=sendmail,
                            re=re,
                            archive_compress=yamlconfig['archive'].get('compress', False))
             t.set_storage(storage)
