@@ -2,24 +2,68 @@ import logging.handlers
 import time
 import random
 import requests
+from requests.adapters import HTTPAdapter
 import socket
 import traceback
 
+global urllib_version
 try:
     from urllib.error import HTTPError, URLError
+    urllib_version = 3
 except ImportError:
     from urllib2 import HTTPError, URLError
+    urllib_version = 2
 
 logger = logging.getLogger('pystemon')
 
+true_socket = socket.socket
+def make_bound_socket(source_ip):
+    def bound_socket(*a, **k):
+        sock = true_socket(*a, **k)
+        sock.bind((source_ip, 0))
+        return sock
+    return bound_socket
+
+# https://requests.readthedocs.io/en/master/user/advanced/#transport-adapters
+class PystemonAdapter(HTTPAdapter):
+    def __init__(self, ip_addr='', *args, **kwargs):
+        self._source_address = ip_addr
+        super(PystemonAdapter, self).__init__(*args, **kwargs)
+
+    def init_poolmanager(self, connections, maxsize, block=False):
+        super(PystemonAdapter, self).init_poolmanager(connections, maxsize, block, source_address=(self._source_address, 0))
+
 class PystemonUA():
 
-    def __init__(self, proxies_list, user_agents_list = [], retries_client = 5, retries_server = 100, throttler=None):
+    def get_bound_session(self):
+        global urllib_version
+        session = requests.Session()
+        if self.ip_addr:
+            try:
+                if urllib_version > 2:
+                    logger.debug("Bounding HTTPAdapter to IP '{}'".format(self.ip_addr))
+                    session.mount('http://', PystemonAdapter(self.ip_addr))
+                    session.mount('https://', PystemonAdapter(self.ip_addr))
+                else:
+                    logger.debug("Bounding socket to IP '{}'".format(self.ip_addr))
+                    socket.setdefaulttimeout(10)  # set a default timeout of 10 seconds to download the page (default = unlimited)
+                    socket.socket = make_bound_socket(self.ip_addr)
+            except Exception as e:
+                logger.debug("Unable to bind to IP '{0}', using default IP address: {1}".format(self.ip_addr, str(e)))
+        return session
+
+    def __init__(self, proxies_list, user_agents_list = [],
+            retries_client=5, retries_server=100,
+            throttler=None, ip_addr=None,
+            connection_timeout=3.05, read_timeout=10):
         self.user_agents_list = user_agents_list
         self.proxies_list = proxies_list
         self.retries_client = retries_client
         self.retries_server = retries_server
         self.throttler = throttler
+        self.ip_addr = ip_addr
+        self.connection_timeout = connection_timeout
+        self.read_timeout = read_timeout
 
     def get_random_user_agent(self):
         if self.user_agents_list:
@@ -29,7 +73,7 @@ class PystemonUA():
     def __parse_http__(self, url, session, random_proxy):
         logger.debug("Parsing response for url '{0}'".format(url))
         try:
-            response = session.get(url, stream=True)
+            response = session.get(url, stream=True, timeout=(self.connection_timeout, self.read_timeout))
             response.raise_for_status()
             res = {'response': response}
         except HTTPError as e:
@@ -110,7 +154,6 @@ class PystemonUA():
         # do NOT try to download the url again here, as we might end in enless loop
         return res
 
-
     def download_url(self, url, data=None, cookie=None, wait=0):
         # let's not recurse where exceptions can raise exceptions can raise exceptions can...
         response = None
@@ -124,7 +167,7 @@ class PystemonUA():
                     logger.debug("download_url: throttling enabled, waiting for permission for download ...")
                     self.throttler.wait()
                     logger.debug("download_url: permission to download granted")
-                session = requests.Session()
+                session = self.get_bound_session()
                 random_proxy = None
                 if self.proxies_list:
                     random_proxy = self.proxies_list.get_random_proxy()

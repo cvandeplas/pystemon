@@ -20,7 +20,6 @@ except ImportError:
     from Queue import Queue
     from Queue import Full
     from Queue import Empty
-from collections import deque
 from datetime import datetime
 try:
     from email.mime.multipart import MIMEMultipart
@@ -33,7 +32,6 @@ except ImportError:
     from email.MIMEText import MIMEText
     from email import Encoders
 import gzip
-import hashlib
 import logging.handlers
 import optparse
 import os
@@ -51,6 +49,7 @@ from io import open
 from pastie.proxy import ProxyList
 from pastie.ua import PystemonUA
 from pastie.throttler import ThreadThrottler
+from pastie.pastiesite import PastieSite
 
 try:
     from urllib.error import HTTPError, URLError
@@ -72,517 +71,13 @@ try:
 except Exception:
     exit('You need python version 2.7 or newer.')
 
-socket.setdefaulttimeout(10)  # set a default timeout of 10 seconds to download the page (default = unlimited)
-true_socket = socket.socket
 
 global proxies_list
 proxies_list = None
 global user_agents_list
 user_agents_list = []
-
-def make_bound_socket(source_ip):
-    def bound_socket(*a, **k):
-        sock = true_socket(*a, **k)
-        sock.bind((source_ip, 0))
-        return sock
-    return bound_socket
-
-class PastieSite(threading.Thread):
-    '''
-    Instances of these threads are responsible for downloading the list of
-    the most recent pastes and add them to the download queue.
-    '''
-
-    def __init__(self, name, download_url, archive_url, archive_regex, **kwargs):
-        threading.Thread.__init__(self)
-        self.kill_received = False
-        self.name = name
-        self.download_url = download_url
-        self.public_url = download_url
-        self.archive_url = archive_url
-        self.archive_regex = archive_regex
-        self.metadata_url = None
-        try:
-            self.ip_addr = yamlconfig['network']['ip']
-            # true_socket = socket.socket
-            socket.socket = make_bound_socket(self.ip_addr)
-        except Exception:
-            logger.debug("Using default IP address")
-        try:
-            self.save_dir = kwargs['site_save_dir'] + os.sep + name
-            if not os.path.exists(self.save_dir):
-                os.makedirs(self.save_dir)
-        except KeyError:
-            pass
-        try:
-            self.archive_dir = kwargs['site_archive_dir'] + os.sep + name
-            if not os.path.exists(self.archive_dir):
-                os.makedirs(self.archive_dir)
-        except KeyError:
-            pass
-
-        if kwargs['site_public_url'] is not None:
-            self.public_url = kwargs['site_public_url']
-        if kwargs['site_metadata_url'] is not None:
-            self.metadata_url = kwargs['site_metadata_url']
-
-        self.archive_compress = kwargs.get('archive_compress', False)
-        self.update_min = kwargs['site_update_min']
-        self.update_max = kwargs['site_update_max']
-        self.user_agent = kwargs.get('site_ua', PystemonUA([]))
-        self.pastie_classname = kwargs['site_pastie_classname']
-        self.seen_pasties = deque('', 1000)  # max number of pasties ids in memory
-        self.storage = None
-
-    def run(self):
-        logger.info('Thread for PastieSite {0} started'.format(self.name))
-        while not self.kill_received:
-            sleep_time = random.randint(self.update_min, self.update_max)
-            try:
-                # grabs site from queue
-                logger.info(
-                    'Downloading list of new pastes from {name}. '
-                    'Will check again in {time} seconds'.format(
-                        name=self.name, time=sleep_time))
-                # get the list of last pasties, but reverse it
-                # so we first have the old entries and then the new ones
-                last_pasties = self.get_last_pasties()
-                if last_pasties:
-                    amount = len(last_pasties)
-                    while last_pasties:
-                        pastie = last_pasties.pop()
-                        queues[self.name].put(pastie)  # add pastie to queue
-                        del(pastie)
-                    logger.info("Found {amount} new pasties for site {site}. There are now {qsize} pasties to be downloaded.".format(
-                        amount=amount,
-                        site=self.name,
-                        qsize=queues[self.name].qsize()))
-            # catch unknown errors
-            except Exception as e:
-                msg = 'Thread for {name} crashed unexpectectly, '\
-                      'recovering...: {e}'.format(name=self.name, e=e)
-                logger.error(msg)
-                logger.error(traceback.format_exc())
-            finally:
-                time.sleep(sleep_time)
-
-    def set_storage(self, storage):
-        self.storage = storage
-
-    def save_pastie(self, pastie):
-        if self.storage is not None:
-            try:
-                self.storage.save_pastie(pastie)
-            except Exception as e:
-                logger.error('Unable to save pastie {0}: {1}'.format(pastie.id, e))
-
-    def get_last_pasties(self):
-        # reset the pasties list
-        pasties = []
-        # populate queue with data
-        response = self.user_agent.download_url(self.archive_url)
-        if not response:
-            logger.warning("Failed to download page {url}".format(url=self.archive_url))
-            return False
-        htmlPage = response.text
-        if not htmlPage:
-            logger.warning("No HTML content for page {url}".format(url=self.archive_url))
-            return False
-        pasties_ids = re.findall(self.archive_regex, htmlPage)
-        if pasties_ids:
-            for pastie_id in pasties_ids:
-                # check if the pastie was already downloaded
-                # and remember that we've seen it
-                if self.seen_pastie_and_remember(pastie_id):
-                    # do not append the seen things again in the queue
-                    continue
-                # pastie was not downloaded yet. Add it to the queue
-                if self.pastie_classname:
-                    class_name = globals()[self.pastie_classname]
-                    pastie = class_name(self, pastie_id)
-                else:
-                    pastie = Pastie(self, pastie_id)
-                pasties.append(pastie)
-            return pasties
-        logger.error("No last pasties matches for regular expression site:{site} regex:{regex}. Error in your regex? Dumping htmlPage \n {html}".format(site=self.name, regex=self.archive_regex, html=htmlPage))
-        return False
-
-    def seen_pastie(self, pastie_id, **kwargs):
-        ''' check if the pastie was already downloaded. '''
-        logger.debug('Site[{0}]: Checking if pastie[{1}] was aldready seen'.format(self.name, pastie_id))
-        # first look in memory if we have already seen this pastie
-        if self.seen_pasties.count(pastie_id):
-            logger.debug('Site[{0}]: Pastie[{1}] already in memory'.format(self.name, pastie_id))
-            return True
-        if self.storage is not None:
-            if self.storage.seen_pastie(pastie_id, **kwargs):
-                logger.debug('Site[{s}]: Pastie[{id}] found in storage'.format(s=self.name, id=pastie_id))
-                return True
-        logger.debug('Site[{0}]: Pastie[{1}] is unknown'.format(self.name, pastie_id))
-        return False
-
-    def seen_pastie_and_remember(self, pastie_id):
-        '''
-        Check if the pastie was already downloaded
-        and remember that we've seen it
-        '''
-        if self.seen_pastie(pastie_id,
-                            url=self.public_url.format(id=pastie_id),
-                            sitename=self.name,
-                            filename=self.pastie_id_to_filename(pastie_id)):
-            return True
-        # We have not yet seen the pastie.
-        # Keep in memory that we've seen it using
-        # appendleft for performance reasons.
-        # (faster later when we iterate over the deque)
-        logger.debug('Site[{0}]: Marking pastie[{1}] as seen'.format(self.name, pastie_id))
-        return self.seen_pasties.appendleft(pastie_id)
-
-    def pastie_id_to_filename(self, pastie_id):
-        filename = pastie_id.replace('/', '_')
-        if self.archive_compress:
-            filename = filename + ".gz"
-        return filename
-
-
-class Pastie():
-
-    def __init__(self, site, pastie_id):
-        self.site = site
-        self.id = pastie_id
-        self.pastie_content = None
-        self.pastie_metadata = None
-        self.matches = []
-        self.matched = False
-        self.md5 = None
-        self.url = self.site.download_url.format(id=self.id)
-        self.public_url = self.site.public_url.format(id=self.id)
-        self.metadata_url = None
-        if self.site.metadata_url is not None:
-            self.metadata_url = self.site.metadata_url.format(id=self.id)
-        self.filename = self.site.pastie_id_to_filename(self.id)
-        self.user_agent = None
-
-    def hash_pastie(self):
-        if self.pastie_content:
-            try:
-                self.md5 = hashlib.md5(self.pastie_content).hexdigest()
-                logger.debug('Pastie {site} {id} has md5: "{md5}"'.format(site=self.site.name, id=self.id, md5=self.md5))
-            except Exception as e:
-                logger.error('Pastie {site} {id} md5 problem: {e}'.format(site=self.site.name, id=self.id, e=e))
-
-    def download_url(self, url, **kwargs):
-        return self.user_agent.download_url(url, **kwargs)
-
-    def fetch_pastie(self):
-        if self.metadata_url is not None:
-            response = self.download_url(self.metadata_url)
-            if response is not None:
-                response = response.content
-                self.pastie_metadata = response
-        response = self.download_url(self.url)
-        if response is not None:
-            response = response.content
-            self.pastie_content = response
-        return response
-
-    def __fetch_pastie__(self):
-        logger.debug('fetching pastie {0}'.format(self.id))
-        try:
-            self.fetch_start_time = time.time()
-            content = self.fetch_pastie()
-            delta = self.fetch_end_time = time.time()
-            if content is None:
-                logger.debug('failed to fetch pastie {id}'.format(id=self.id))
-            else:
-                delta = self.fetch_end_time - self.fetch_start_time
-                logger.debug('fetched pastie {id}: {s}s, {b}B'.format(id=self.id, s=delta, b=len(content)))
-        except Exception as e:
-            logger.error('ERROR: Failed to fetch pastie {site} {id}: {e}'.format(
-                site=self.site.name,
-                id=self.id,
-                e=e))
-
-    def save_pastie(self):
-        self.site.save_pastie(self)
-
-    '''
-    This is the entry point of the PastieSite to download the pastie
-    To have a stable ABI, this function should save all required
-     elements in the pastie, such as the UA.
-    '''
-    def fetch_and_process_pastie(self, user_agent):
-        self.user_agent = user_agent
-        # download pastie
-        self.__fetch_pastie__()
-        # check pastie
-        if self.pastie_content is None:
-            return
-        try:
-            # take checksum
-            self.hash_pastie()
-            # search for data in pastie
-            self.search_content()
-        except Exception as e:
-            logger.error('ERROR: unable to process pastie {0} for site {1}: {2}'.format(
-                self.id, self.site.name, e))
-            return
-        try:
-            self.save_pastie()
-        except Exception as e:
-            logger.error('ERROR: unable to save pastie {0} for site {1}: {2}'.format(
-                self.id, self.site.name, e))
-        try:
-            if self.matches:
-                # alerting
-                self.action_on_match()
-            else:
-                # only debugging for now
-                self.action_on_miss()
-        except Exception as e:
-            logger.error("ERROR: on post-action for pastie {0}: {1}".format(self.id, e))
-
-    def search_content(self):
-        if not self.pastie_content:
-            raise SystemExit('BUG: Content not set, cannot search')
-        logger.debug('Looking for matches in pastie {url}'.format(url=self.public_url))
-        # search for the regexes in the htmlPage
-        for regex in patterns:
-            if regex.match(self.pastie_content):
-                # we have a match, add to match list
-                self.matches.append(regex)
-                self.matched = True
-
-    def action_on_match(self):
-        msg = 'Found hit for {matches} in pastie {url}'.format(
-            matches=self.matches_to_text(), url=self.public_url)
-        logger.info(msg)
-        # Send email alert if configured
-        if yamlconfig['email']['alert']:
-            self.send_email_alert()
-
-    def action_on_miss(self):
-        msg = 'No match found for pastie {url}'.format(url=self.public_url)
-        logger.debug(msg)
-
-    def matches_to_text(self):
-        descriptions = []
-        for match in self.matches:
-            descriptions.append(match.to_text())
-        if descriptions:
-            return '[{}]'.format(', '.join([description for description in descriptions]))
-        else:
-            return ''
-
-    def matches_to_regex(self):
-        descriptions = []
-        for match in self.matches:
-            descriptions.append(match.to_regex())
-        if descriptions:
-            return '[{}]'.format(', '.join([description for description in descriptions]))
-        else:
-            return ''
-
-    def matches_to_dict(self):
-        res = []
-        for match in self.matches:
-            res.append(match.to_dict())
-        return res
-
-    def send_email_alert(self):
-        msg = MIMEMultipart()
-        alert = "Found hit for {matches} in pastie {url}".format(matches=self.matches_to_text(), url=self.public_url)
-        # headers
-        msg['Subject'] = yamlconfig['email']['subject'].format(subject=alert)
-        msg['From'] = yamlconfig['email']['from']
-        # build the list of recipients
-        recipients = []
-        recipients.append(yamlconfig['email']['to'])  # first the global alert email
-        for match in self.matches:                    # per match, the custom additional email
-            if match.to is not None:
-                recipients.extend(match.ato)
-        msg['To'] = ','.join(recipients)  # here the list needs to be comma separated
-        if len(self.pastie_content) > yamlconfig['email']['size-limit']:
-            part = MIMEBase('application', "text/plain")
-            part.set_payload(self.pastie_content.decode('utf8'))
-            Encoders.encode_base64(part)
-            part.add_header('Content-Disposition', 'attachment; filename="{id}.txt"'.format(id=self.id))
-            msg.attach(part)
-            content = "*** Content to large to be displayed, see attachment ***"
-        else:
-            content = self.pastie_content.decode('utf8')
-        # message body including full paste if not to large rather than attaching it
-        message = '''
-I found a hit for a regular expression on one of the pastebin sites.
-
-The site where the paste came from :        {site}
-The original paste was located here:        {url}
-And the regular expressions that matched:   {matches}
-
-Below (after newline) is the content of the pastie:
-
-{content}
-
-        '''.format(site=self.site.name, url=self.public_url, matches=self.matches_to_regex(), content=content)
-        msg.attach(MIMEText(message))
-        # send out the mail
-        try:
-            s = smtplib.SMTP(yamlconfig['email']['server'], yamlconfig['email']['port'])
-            if yamlconfig['email']['tls']:
-                s.starttls()
-            # login to the SMTP server if configured
-            if 'username' in yamlconfig['email'] and yamlconfig['email']['username']:
-                s.login(yamlconfig['email']['username'], yamlconfig['email']['password'])
-            # send the mail
-            s.sendmail(yamlconfig['email']['from'], recipients, msg.as_string())
-            s.close()
-        except smtplib.SMTPException as e:
-            logger.error("ERROR: unable to send email: {0}".format(e))
-        except Exception as e:
-            logger.error("ERROR: unable to send email. Are your email setting correct?: {e}".format(e=e))
-
-
-class PastieBerylia(Pastie):
-    '''
-    Custom Pastie class for the berylia.org site, related to the LockedShields cyber exercise
-    This class overloads the fetch_pastie function to extract the pastie from the page
-    '''
-
-    def __init__(self, site, pastie_id):
-        Pastie.__init__(self, site, pastie_id)
-
-    def fetch_pastie(self):
-        response = self.download_url(self.url)
-        downloaded_page = response.text
-        if downloaded_page:
-            # convert to json object
-            json_pastie = json.loads(downloaded_page)
-            if json_pastie:
-                # and extract the code
-                self.pastie_content = json_pastie['paste']
-        return self.pastie_content
-
-
-class PastiePasteOrgRu(Pastie):
-    '''
-    Custom Pastie class for the paste.org.ru site,
-    This class overloads the fetch_pastie function to extract the pastie from the page
-    '''
-
-    def __init__(self, site, pastie_id):
-        Pastie.__init__(self, site, pastie_id)
-
-    def fetch_pastie(self):
-        response = self.download_url(self.url)
-        if response.text:
-            htmlDom = BeautifulSoup(response.text, 'lxml')
-            if not htmlDom:
-                return self.pastie_content
-            self.pastie_content = htmlDom.find('textarea').contents.pop().encode('utf-8')
-        return self.pastie_content
-
-
-class PastiePasteSiteCom(Pastie):
-    '''
-    Custom Pastie class for the pastesite.com site
-    This class overloads the fetch_pastie function to do the form
-    submit to get the raw pastie
-    '''
-
-    def __init__(self, site, pastie_id):
-        Pastie.__init__(self, site, pastie_id)
-
-    def fetch_pastie(self):
-        response = self.download_url(self.url)
-        validation_form_page = response.text
-        if validation_form_page:
-            htmlDom = BeautifulSoup(validation_form_page, 'lxml')
-            if not htmlDom:
-                return self.pastie_content
-            content_left = htmlDom.find(id='full-width')
-            if not content_left:
-                return self.pastie_content
-            plain_confirm = content_left.find('input')['value']
-            # build a form with plainConfirm = value (the cookie remains in the requests session)
-            data = urlencode({'plainConfirm': plain_confirm})
-            url = "http://pastesite.com/plain/{id}".format(id=self.id)
-            response2 = self.download_url(url, data=data)
-            self.pastie_content = response2
-        return self.pastie_content
-
-
-class PastieSlexyOrg(Pastie):
-    '''
-    Custom Pastie class for the pastesite.com site
-    This class overloads the fetch_pastie function to do the form
-    submit to get the raw pastie
-    '''
-
-    def __init__(self, site, pastie_id):
-        Pastie.__init__(self, site, pastie_id)
-
-    def fetch_pastie(self):
-        response = self.download_url(self.url)
-        validation_form_page = response.text
-        if validation_form_page:
-            htmlDom = BeautifulSoup(validation_form_page, 'lxml')
-            if not htmlDom:
-                return self.pastie_content
-            a = htmlDom.find('a', {'target': '_blank'})
-            if not a:
-                return self.pastie_content
-            url = "https://slexy.org{}".format(a['href'])
-            response2 = self.download_url(url)
-            self.pastie_content = response2.content
-        return self.pastie_content
-
-
-class PastieCdvLt(Pastie):
-    '''
-    Custom Pastie class for the cdv.lt site
-    This class overloads the fetch_pastie function to do the form submit
-    to get the raw pastie
-    '''
-
-    def __init__(self, site, pastie_id):
-        Pastie.__init__(self, site, pastie_id)
-
-    def fetch_pastie(self):
-        response = self.download_url(self.url)
-        downloaded_page = response.text
-        if downloaded_page:
-            # convert to json object
-            json_pastie = json.loads(downloaded_page)
-            if json_pastie:
-                # and extract the code
-                self.pastie_content = json_pastie['snippet']['snippetData']
-        return self.pastie_content
-
-
-class PastieSniptNet(Pastie):
-    '''
-    Custom Pastie class for the snipt.net site
-    This class overloads the fetch_pastie function to do the form submit
-    to get the raw pastie
-    '''
-
-    def __init__(self, site, pastie_id):
-        Pastie.__init__(self, site, pastie_id)
-
-    def fetch_pastie(self):
-        response = self.download_url(self.url)
-        downloaded_page = response.text
-        if downloaded_page:
-            htmlDom = BeautifulSoup(downloaded_page)
-            # search for <textarea class="raw">
-            textarea = htmlDom.find('textarea', {'class': 'raw'})
-            if textarea and textarea.contents:
-                # replace html entities like &gt;
-                decoded = BeautifulSoup(
-                    textarea.contents[0],
-                    convertEntities=BeautifulSoup.HTML_ENTITIES)
-                self.pastie_content = decoded.contents[0]
-        return self.pastie_content
+global ip_addr
+ip_addr = ''
 
 class ThreadPasties(threading.Thread):
     '''
@@ -1159,6 +654,7 @@ def load_user_agents_from_file(filename):
 def parse_config_file(configfile, debug):
     global yamlconfig
     global proxies_list
+    global ip_addr
     try:
         yamlconfig = yaml.load(open(configfile), Loader=yaml.FullLoader)
     except yaml.YAMLError as exc:
@@ -1179,6 +675,12 @@ def parse_config_file(configfile, debug):
         proxies_list = ProxyList(yamlconfig['proxy']['file'])
     if yamlconfig['user-agent']['random']:
         load_user_agents_from_file(yamlconfig['user-agent']['file'])
+
+    try:
+        ip_addr = yamlconfig['network']['ip']
+    except:
+        logger.debug("Using default IP address")
+        pass
 
     # initialize database backends
     storage_engines = []
@@ -1309,6 +811,7 @@ def main(storage_engines):
     global patterns
     global proxies_list
     global user_agents_list
+    global ip_addr
     queues = {}
     threads = []
     patterns = []
@@ -1385,6 +888,7 @@ def main(storage_engines):
         else:
             logger.warning("Site: {} is not enabled or disabled in config file. We just assume it disabled.".format(site))
 
+
     '''
      for each site enabled:
      - get the configuration
@@ -1412,7 +916,7 @@ def main(storage_engines):
             queues[site] = Queue()
 
             for i in range(yamlconfig['threads']):
-                user_agent = PystemonUA(proxies_list, user_agents_list=user_agents_list, throttler=throttler)
+                user_agent = PystemonUA(proxies_list, user_agents_list=user_agents_list, throttler=throttler, ip_addr=ip_addr)
                 t = ThreadPasties(user_agent, queue_name=site, queue=queues[site])
                 threads.append(t)
                 t.setDaemon(True)
@@ -1426,7 +930,10 @@ def main(storage_engines):
                            site_pastie_classname=yamlconfig['site'][site].get('pastie-classname'),
                            site_save_dir=yamlconfig['archive'].get('dir'),
                            site_archive_dir=yamlconfig['archive'].get('dir-all'),
-                           site_ua=PystemonUA(proxies_list, user_agents_list=user_agents_list, throttler=throttler),
+                           site_ua=PystemonUA(proxies_list, user_agents_list=user_agents_list, throttler=throttler, ip_addr=ip_addr),
+                           site_queue=queues[site],
+                           patterns=patterns,
+                           re=re,
                            archive_compress=yamlconfig['archive'].get('compress', False))
             t.set_storage(storage)
             threads.append(t)
@@ -1434,7 +941,7 @@ def main(storage_engines):
             t.start()
 
         except Exception as e:
-            logger.error('Unable to initialize pastie site {0}: {1}'.format(site_name, e))
+            logger.error('Unable to initialize pastie site {0}: {1}'.format(site, e))
 
     signal.signal(signal.SIGTERM, cleanup)
     # wait while all the threads are running and someone sends CTRL+C
