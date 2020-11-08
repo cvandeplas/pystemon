@@ -6,8 +6,8 @@ import random
 import os
 from collections import deque
 import importlib
-from pastie.ua import PystemonUA
-from pastie.pastie import Pastie
+from pystemon.ua import PystemonUA
+from pystemon.pastie import Pastie
 
 logger = logging.getLogger('pystemon')
 

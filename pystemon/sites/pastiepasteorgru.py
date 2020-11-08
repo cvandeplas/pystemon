@@ -1,5 +1,5 @@
 from bs4 import BeautifulSoup
-from pastie.pastie import Pastie
+from pystemon.pastie import Pastie
 import logging.handlers
 logger = logging.getLogger('pystemon')
 

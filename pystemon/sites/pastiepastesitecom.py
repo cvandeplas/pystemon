@@ -1,9 +1,14 @@
 from bs4 import BeautifulSoup
-from pastie.pastie import Pastie
+try:
+    from urllib.parse import urlencode
+except ImportError:
+    from urllib import urlencode
+
+from pystemon.pastie import Pastie
 import logging.handlers
 logger = logging.getLogger('pystemon')
 
-class PastieSlexyOrg(Pastie):
+class PastiePasteSiteCom(Pastie):
     '''
     Custom Pastie class for the pastesite.com site
     This class overloads the fetch_pastie function to do the form
@@ -20,11 +25,15 @@ class PastieSlexyOrg(Pastie):
             htmlDom = BeautifulSoup(validation_form_page, 'lxml')
             if not htmlDom:
                 return self.pastie_content
-            a = htmlDom.find('a', {'target': '_blank'})
-            if not a:
+            content_left = htmlDom.find(id='full-width')
+            if not content_left:
                 return self.pastie_content
-            url = "https://slexy.org{}".format(a['href'])
-            response2 = self.download_url(url)
-            self.pastie_content = response2.content
+            plain_confirm = content_left.find('input')['value']
+            # build a form with plainConfirm = value (the cookie remains in the requests session)
+            data = urlencode({'plainConfirm': plain_confirm})
+            url = "http://pastesite.com/plain/{id}".format(id=self.id)
+            response2 = self.download_url(url, data=data)
+            self.pastie_content = response2
         return self.pastie_content
+
 

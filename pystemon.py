@@ -34,11 +34,11 @@ import threading
 # LATER: multiprocessing to parse regex
 import time
 from io import open
-from pastie.proxy import ProxyList
-from pastie.ua import PystemonUA
-from pastie.throttler import ThreadThrottler
-from pastie.pastiesite import PastieSite
-from pastie.sendmail import PystemonSendmail
+from pystemon.proxy import ProxyList
+from pystemon.ua import PystemonUA
+from pystemon.throttler import ThreadThrottler
+from pystemon.pastiesite import PastieSite
+from pystemon.sendmail import PystemonSendmail
 
 try:
     from urllib.error import HTTPError, URLError

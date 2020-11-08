@@ -1,12 +1,13 @@
 import json
-from pastie.pastie import Pastie
+from pystemon.pastie import Pastie
 import logging.handlers
 logger = logging.getLogger('pystemon')
 
-class PastieBerylia(Pastie):
+class PastieCdvLt(Pastie):
     '''
-    Custom Pastie class for the berylia.org site, related to the LockedShields cyber exercise
-    This class overloads the fetch_pastie function to extract the pastie from the page
+    Custom Pastie class for the cdv.lt site
+    This class overloads the fetch_pastie function to do the form submit
+    to get the raw pastie
     '''
 
     def __init__(self, site, pastie_id):
@@ -20,7 +21,6 @@ class PastieBerylia(Pastie):
             json_pastie = json.loads(downloaded_page)
             if json_pastie:
                 # and extract the code
-                self.pastie_content = json_pastie['paste']
+                self.pastie_content = json_pastie['snippet']['snippetData']
         return self.pastie_content
-
 
