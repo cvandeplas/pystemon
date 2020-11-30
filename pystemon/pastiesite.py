@@ -18,24 +18,36 @@ class PastieSite(threading.Thread):
     '''
 
     def __init__(self, name, download_url, archive_url, archive_regex, **kwargs):
+
         threading.Thread.__init__(self)
+        self.name = "PastieSite[{}]".format(name)
+        logger.debug("{}: initializing ...".format(self.name))
+
         self.kill_received = False
-        self.name = name
         self.download_url = download_url
         self.public_url = download_url
         self.archive_url = archive_url
         self.archive_regex = archive_regex
         self.metadata_url = None
+        self.condition = threading.Condition()
+
         try:
-            self.save_dir = kwargs['site_save_dir'] + os.sep + name
-            if not os.path.exists(self.save_dir):
-                os.makedirs(self.save_dir)
+            site_save_dir = kwargs['site_save_dir']
+            if site_save_dir is not None:
+                self.save_dir = site_save_dir  + os.sep + name
+                logger.debug("{}: pasties will be saved in '{}'".format(self.name, self.save_dir))
+                if not os.path.exists(self.save_dir):
+                    os.makedirs(self.save_dir)
         except KeyError:
             pass
+
         try:
-            self.archive_dir = kwargs['site_archive_dir'] + os.sep + name
-            if not os.path.exists(self.archive_dir):
-                os.makedirs(self.archive_dir)
+            site_archive_dir = kwargs['site_archive_dir']
+            if site_archive_dir is not None:
+                self.archive_dir = site_archive_dir + os.sep + name
+                logger.debug("{}: pasties will be archived in '{}'".format(self.name, self.archive_dir))
+                if not os.path.exists(self.archive_dir):
+                    os.makedirs(self.archive_dir)
         except KeyError:
             pass
 
@@ -48,14 +60,10 @@ class PastieSite(threading.Thread):
         self.update_min = kwargs['site_update_min']
         self.update_max = kwargs['site_update_max']
         self.queue = kwargs['site_queue']
-        self.user_agent = kwargs.get('site_ua', PystemonUA([]))
+        self.user_agent = kwargs['site_ua']
         self.patterns = kwargs.get('patterns', [])
         self.sendmail = kwargs.get('sendmail', None)
-        try:
-            self.re = kwargs['re']
-        except:
-            import re
-            self.re = re
+        self.re = kwargs['re']
         self.seen_pasties = deque('', 1000)  # max number of pasties ids in memory
         self.storage = None
         pastie_classname = kwargs['site_pastie_classname']
@@ -63,7 +71,7 @@ class PastieSite(threading.Thread):
             modname = pastie_classname.lower()
             try:
                 logger.debug("loading module {0} for pastie site {1}".format(modname, pastie_classname))
-                module = importlib.import_module("pastie.sites."+modname)
+                module = importlib.import_module("pystemon.pastie."+modname)
                 logger.debug("module {0} successfully loaded".format(modname))
                 self.pastie_class = getattr(module, pastie_classname)
             except Exception as e:
@@ -71,38 +79,45 @@ class PastieSite(threading.Thread):
                 raise e
         else:
             self.pastie_class = None
+        logger.debug("{}: initialized".format(self.name))
+
+    def stop(self):
+        with self.condition:
+            logger.info('{}: exiting'.format(self.name))
+            self.kill_received = True
+            self.user_agent.stop()
+            self.condition.notify_all()
 
     def run(self):
-        logger.info('Thread for PastieSite {0} started'.format(self.name))
-        while not self.kill_received:
-            sleep_time = random.randint(self.update_min, self.update_max)
-            try:
-                # grabs site from queue
-                logger.info(
-                    'Downloading list of new pastes from {name}. '
-                    'Will check again in {time} seconds'.format(
-                        name=self.name, time=sleep_time))
-                # get the list of last pasties, but reverse it
-                # so we first have the old entries and then the new ones
-                last_pasties = self.get_last_pasties()
-                if last_pasties:
-                    amount = len(last_pasties)
-                    while last_pasties:
-                        pastie = last_pasties.pop()
-                        self.queue.put(pastie)  # add pastie to queue
-                        del(pastie)
-                    logger.info("Found {amount} new pasties for site {site}. There are now {qsize} pasties to be downloaded.".format(
-                        amount=amount,
-                        site=self.name,
-                        qsize=self.queue.qsize()))
-            # catch unknown errors
-            except Exception as e:
-                msg = 'Thread for {name} crashed unexpectectly, '\
-                      'recovering...: {e}'.format(name=self.name, e=e)
-                logger.error(msg)
-                logger.error(traceback.format_exc())
-            finally:
-                time.sleep(sleep_time)
+        logger.info('{}: Thread started'.format(self.name))
+        try:
+            with self.condition:
+                while not self.kill_received:
+                    sleep_time = random.randint(self.update_min, self.update_max)
+                    # grabs site from queue
+                    logger.info('{}: Downloading list of new pastes, will check again in {} seconds'.format(
+                                self.name, sleep_time))
+                    # get the list of last pasties, but reverse it
+                    # so we first have the old entries and then the new ones
+                    last_pasties = self.get_last_pasties()
+                    if last_pasties:
+                        amount = len(last_pasties)
+                        while last_pasties:
+                            pastie = last_pasties.pop()
+                            self.queue.put(pastie)  # add pastie to queue
+                            del(pastie)
+                        logger.info("Found {amount} new pasties for site {site}. There are now {qsize} pasties to be downloaded.".format(
+                            amount=amount,
+                            site=self.name,
+                            qsize=self.queue.qsize()))
+                    self.condition.wait(sleep_time)
+        # catch unknown errors
+        except Exception as e:
+            msg = 'Thread for {name} crashed unexpectectly, '\
+                  'recovering...: {e}'.format(name=self.name, e=e)
+            logger.error(msg)
+            logger.error(traceback.format_exc())
+        logger.info('{}: Thread exited'.format(self.name))
 
     def send_email_alert(self, pastie):
         if self.sendmail is not None:

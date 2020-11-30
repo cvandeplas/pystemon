@@ -1,15 +1,8 @@
-#network:               # Network settings
-#  ip: '1.1.1.1'        # Specify source IP address if you want to bind on a specific one
+network:               # Network settings
+  ip: '172.17.85.12'        # Specify source IP address if you want to bind on a specific one
 
 pid:
   filename: '/var/run/pystemon.pid'
-
-archive:
-  save: yes             # Keep a copy of pasties that triggered alerts
-  save-all: yes         # Keep a copy of all pasties
-  dir: "alerts"         # Directory where matching pasties should be kept
-  dir-all: "archive"    # Directory where all pasties should be kept (if save-all is set to yes)
-  compress: yes         # Store the pasties compressed
 
 engine: re              # Only re (default) or regex (pip install regex) are supported.
 strict_regex: no        # when compiling regex, hard fail or not on error
@@ -18,37 +11,55 @@ save-thread: no         # Use a separate thread to save pasties
 
 logging-level: INFO     # Define logging level (NOTSET, DEBUG, INFO, WARNING, ERROR, CRITICAL)
 
-db:
+storage:
+
+  archive:
+    storage-classname:    FileStorage
+    save: yes             # Keep a copy of pasties that triggered alerts
+    save-all: yes         # Keep a copy of all pasties
+    dir: "alerts"         # Directory where matching pasties should be kept
+    dir-all: "archive"    # Directory where all pasties should be kept (if save-all is set to yes)
+    compress: yes         # Store the pasties compressed
+
   sqlite3:              # Store information about the pastie in a database
+    storage-classname:    Sqlite3Storage
     enable: no          # Activate this DB engine   # NOT FULLY IMPLEMENTED
     file: 'db.sqlite3'  # The filename of the database
     lookup: no          # lookup sqlite for already seen pasties
 
-mongo:
-  save: no              # Keep a copy of pasties that triggered alerts
-  save-all: no          # Keep a copy of all pasties
-  save-profile:         # configure which data to save
-    content-on-miss: no # save the content even on miss
-    timestamp: no       # add the timestamp (UTC)
-    url: no             # add the public URL
-    site: no            # add the site
-    id: no              # add the per-site id
-    matched: no         # add the matched status (usefull if content-on-miss = yes)
-    filename: no        # add the local filename (to no store content in mongodb)
-  lookup: no            # lookup mongodb for already seen pasties
-  database: "paste"
-  collection: "paste"
-  url: "mongodb://localhost"
-  user:
-  password:
+  mongo:
+    storage-classname:    MongoStorage
+    save: no              # Keep a copy of pasties that triggered alerts
+    save-all: no          # Keep a copy of all pasties
+    save-profile:         # configure which data to save
+      content-on-miss: no # save the content even on miss
+      timestamp: no       # add the timestamp (UTC)
+      url: no             # add the public URL
+      site: no            # add the site
+      id: no              # add the per-site id
+      matched: no         # add the matched status (usefull if content-on-miss = yes)
+      filename: no        # add the local filename (to no store content in mongodb)
+    lookup: no            # lookup mongodb for already seen pasties
+    database: "paste"
+    collection: "paste"
+    url: "mongodb://localhost"
+    user:
+    password:
 
-redis:
-  queue: no             # Keep a copy of pasties that triggered alerts
-  queue-all: no         # Keep a copy of all pasties
-  server: "localhost"
-  port: 6379
-  database: 10
-  lookup: no            # lookup redisdb for already seen pasties (NOT IMPLEMENTED)
+  redis:
+    storage-classname:    RedisStorage
+    save: no             # Keep a copy of pasties that triggered alerts
+    save-all: no         # Keep a copy of all pasties
+    server: "localhost"
+    port: 6379
+    database: 10
+    lookup: no            # lookup redisdb for already seen pasties (NOT IMPLEMENTED)
+
+  telegram:
+    storage-classname:    TelegramStorage
+    enable: no            # Enable this alerting engine
+    token: 0              # see https://core.telegram.org/bots/api#authorizing-your-bot
+    chat-id: 0
 
 email:
   alert: no             # Enable/disable email alerts
@@ -61,11 +72,6 @@ email:
   password: ''          # (optional) Password for authentication. Leave blank for no authentication.
   subject: '[pystemon] - {subject}'
   size-limit: 1048576   # Size limit for pastie, above it's sent as attachement
-
-telegram:
-  enable: no            # Enable this alerting engine
-  token: 0              # see https://core.telegram.org/bots/api#authorizing-your-bot
-  chat-id: 0
 
 #####
 # Definition of regular expressions to search for in the pasties
@@ -116,12 +122,13 @@ site:
 #                       # This is practical for sites that require custom fetchPastie() functions
 
   pastebin.com:
-    enable: yes
+    enable: no
     archive-url: 'https://pastebin.com/archive'
     archive-regex: '<a href="/(\w{8})">.+</a></td>'
     download-url: 'https://pastebin.com/raw/{id}'
     update-max: 50
     update-min: 40
+    throttling: 5000
 
   # Note: The official scraping has been discontinued: https://twitter.com/pastebin/status/1250455777069817856?s=20
   # See https://pastebin.com/api_scraping_faq , you will need a pro account on pastebin
@@ -145,13 +152,16 @@ site:
     archive-regex: '<a href="/view/([a-zA-Z0-9]+)">View paste</a>'
     download-url: 'https://slexy.org/view/{id}'
     pastie-classname: PastieSlexyOrg
-    throttling: 1000
+    update-max: 50
+    update-min: 40
+    throttling: 5000
 
   gist.github.com:
-    enable: yes
+    enable: no
     archive-url: 'https://gist.github.com/discover'
     archive-regex: '<a href="/([A-Za-z0-9]+/[A-Za-z0-9]+)">'
     download-url: 'https://gist.githubusercontent.com/{id}/raw/'
+    throttling: 5000
 
 
   codepad.org:
@@ -159,37 +169,43 @@ site:
     archive-url: 'http://codepad.org/recent'
     archive-regex: '<a href="http://codepad.org/([a-zA-Z0-9]+)">view'
     download-url: 'http://codepad.org/{id}/raw.txt'
+    throttling: 5000
 
   paste.org.ru:
-    enable: yes
+    enable: no
     archive-url: 'http://paste.org.ru'
     archive-regex: '<a href=''/\?(\w+)''>'
     download-url: 'http://paste.org.ru/?{id}'
     pastie-classname: PastiePasteOrgRu
+    throttling: 5000
  
   kpaste.net:
-    enable: yes
+    enable: no
     archive-url: 'http://kpaste.net/'
     archive-regex: '" href="/(\w+)">'
     download-url: 'http://kpaste.net/{id}?raw'
+    throttling: 5000
 
   ideone.com:
-    enable: yes
+    enable: no
     archive-url: 'https://ideone.com/recent'
     archive-regex: '<a href="/([a-zA-Z0-9]+)">#'
     download-url: 'https://ideone.com/plain/{id}'
+    throttling: 5000
 
   pastebin.fr:
-    enable: yes
+    enable: no
     archive-url: 'http://pastebin.fr'
     archive-regex: '<a href="http://pastebin.fr/(\d+)'
     download-url: 'http://pastebin.fr/pastebin.php?dl={id}'
+    throttling: 5000
 
   pastebin.gr:
-    enable: yes
+    enable: no
     archive-url: 'http://pastebin.gr/archive'
     archive-regex: '<td><a href="(\d+)" title='
     download-url: 'http://pastebin.gr/paste.php?download&id={id}'
+    throttling: 5000
 
   # Exercise related sites
   # this is site related to the LockedShields Cyber exercise.
@@ -199,6 +215,7 @@ site:
     archive-regex: '"pid":"([a-zA-Z0-9]+)",'
     download-url: 'https://pastebin.berylia.org/api/paste/{id}'
     pastie-classname: PastieBerylia
+    throttling: 5000
 
 
 # Sites that are offline:
@@ -279,5 +296,5 @@ proxy:
 # Configuration section for User-Agents
 #
 user-agent:
-  random: no
+  random: yes
   file: 'user-agents.txt'

@@ -19,10 +19,11 @@ class ThreadProxyList(threading.Thread):
         self.condition = threading.Condition()
         self.kill_received = False
 
-    def goway(self):
+    def stop(self):
         with self.condition:
             logger.info('ThreadProxyList exiting')
             self.kill_received = True
+            self.condition.notify_all()
 
     def reset(self, wait=1):
         with self.condition:
@@ -32,14 +33,17 @@ class ThreadProxyList(threading.Thread):
 
     def run(self):
         logger.info('ThreadProxyList started')
-        with self.condition:
-            while not self.kill_received:
-                mtime = os.stat(self.list.filename).st_mtime
-                if mtime != self.last_mtime:
-                    logger.debug('Proxy configuration file changed. Reloading proxy list.')
-                    self.list.load_proxies_from_file()
-                    self.last_mtime = mtime
-                self.condition.wait(1)
+        try:
+            with self.condition:
+                while not self.kill_received:
+                    mtime = os.stat(self.list.filename).st_mtime
+                    if mtime != self.last_mtime:
+                        logger.debug('Proxy configuration file changed. Reloading proxy list.')
+                        self.list.load_proxies_from_file()
+                        self.last_mtime = mtime
+                    self.condition.wait(1)
+        except Exception as e:
+            logger.error('ThreadProxyList crashed: {0}'.format(e))
         logger.info('ThreadProxyList exited')
 
 class ProxyList():

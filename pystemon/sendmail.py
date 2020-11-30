@@ -28,6 +28,25 @@ class PystemonSendmail():
         self.password = password
         self.size_limit = size_limit
 
+    def __eq__(self, other):
+        return ((self.mailfrom == other.mailfrom)
+                and
+                (self.mailto == other.mailto)
+                and
+                (self.subject == other.subject)
+                and
+                (self.server == other.server)
+                and
+                (self.port == other.port)
+                and
+                (self.tls == other.tls)
+                and
+                (self.username == other.username)
+                and
+                (self.password == other.password)
+                and
+                (self.size_limit == other.size_limit))
+
     def send_pastie_alert(self, pastie):
         msg = MIMEMultipart()
         alert = "Found hit for {matches} in pastie {url}".format(matches=pastie.matches_to_text(), url=pastie.public_url)

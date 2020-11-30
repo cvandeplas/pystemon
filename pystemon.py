@@ -21,11 +21,9 @@ except ImportError:
     from Queue import Full
     from Queue import Empty
 from datetime import datetime
-import gzip
 import logging.handlers
 import optparse
 import os
-import random
 import json
 import sys
 import signal
@@ -39,6 +37,9 @@ from pystemon.ua import PystemonUA
 from pystemon.throttler import ThreadThrottler
 from pystemon.pastiesite import PastieSite
 from pystemon.sendmail import PystemonSendmail
+from pystemon.storage import PastieStorage
+from pystemon.config import PystemonConfig
+from pystemon.exception import PystemonException,PystemonStopRequested,PystemonReloadRequested
 
 try:
     from urllib.error import HTTPError, URLError
@@ -60,16 +61,6 @@ try:
 except Exception:
     exit('You need python version 2.7 or newer.')
 
-
-global proxies_list
-proxies_list = None
-global user_agents_list
-user_agents_list = []
-global ip_addr
-ip_addr = ''
-global sendmail
-sendmail = None
-
 class ThreadPasties(threading.Thread):
     '''
     Instances of these threads are responsible for downloading the pastes
@@ -80,113 +71,42 @@ class ThreadPasties(threading.Thread):
         threading.Thread.__init__(self)
         self.user_agent = user_agent
         self.queue = queue
-        self.name = queue_name
+        self.name = 'ThreadPasties[{}]'.format(queue_name)
+        self.condition = threading.Condition()
         self.kill_received = False
 
+    def stop(self):
+        with self.condition:
+            logger.info('{}: exiting'.format(self.name))
+            self.kill_received = True
+            self.user_agent.stop()
+            self.condition.notify_all()
+
     def run(self):
-        while not self.kill_received:
-            # grabs pastie from queue
-            pastie = self.queue.get()
+        logger.info('{}: started'.format(self.name))
+        while True:
+            with self.condition:
+                if self.kill_received:
+                    break
+            pastie = None
             try:
+                # grabs pastie from queue
+                pastie = self.queue.get(block=True, timeout=1)
                 pastie.fetch_and_process_pastie(self.user_agent)
-                logger.debug("Queue {name} size: {size}".format(
-                    size=self.queue.qsize(), name=self.name))
+            except Empty:
+                pass
             # catch unknown errors
             except Exception as e:
-                msg = "ThreadPasties for {name} crashed unexpectedly, "\
-                      "recovering...: {e}".format(name=self.name, e=e)
-                logger.error(msg)
+                logger.error("{} crashed unexpectedly, recovering...: {}".format(self.name, e))
                 logger.debug(traceback.format_exc())
             finally:
+                logger.debug("{}: Queue size: {}".format(self.name, self.queue.qsize()))
                 # just to be on the safe side of the gc
-                del(pastie)
-                # signals to queue job is done
-                self.queue.task_done()
-
-class PastieSearch():
-    def __init__(self, regex):
-        # set the re.FLAGS
-        if 'regex-flags' in regex:
-            self.regex_flags = regex['regex-flags']
-            self.flags = eval(self.regex_flags)
-        else:
-            self.regex_flags = None
-            self.flags = re.IGNORECASE
-        # compile the search regex
-        self.search = regex['search']
-        try:
-            self.re_search = re.compile(self.search.encode(), self.flags)
-        except Exception as e:
-            raise ValueError("invalid search regex: %s" % e)
-        # compile the exclude regex
-        self.exclude = regex.get('exclude')
-        if self.exclude is not None:
-            try:
-                self.re_exclude = re.compile(self.exclude.encode(), self.flags)
-            except Exception as e:
-                raise ValueError("invalid exclude regex: %s" % e)
-        # get the description
-        self.description = regex.get('description')
-        # get the count and convert it to integer
-        if 'count' in regex:
-            self.count = int(regex['count'])
-        else:
-            self.count = -1
-        # get the optional to and split it
-        self.to = regex.get('to')
-        if self.to is not None:
-            self.ato = self.to.split(",")
-        else:
-            self.ato = []
-        # add any extra things stored in yaml
-        self.extra = {}
-        for (k, v) in regex.items():
-            if k in ['search', 'description', 'exclude', 'count', 'regex-flags', 'to']:
-                continue
-            self.extra[k] = v
-        self.h = None
-
-    def match(self, string):
-        m = self.re_search.findall(string)
-        if not m:
-            return False
-        # the regex matches the text
-        # ignore if not enough counts
-        if (self.count > 0) and (len(m) < self.count):
-            return False
-        # ignore if exclude
-        if self.exclude is not None:
-            if self.re_exclude.search(string):
-                return False
-        # we have a match
-        return True
-
-    def to_text(self):
-        if self.description is None:
-            return self.search
-        return self.description
-
-    def to_regex(self):
-        return self.search
-
-    def to_dict(self):
-        if self.h is None:
-            self.h = {'search': self.search}
-            if self.description is not None:
-                self.h['description'] = self.description
-            if self.exclude is not None:
-                self.h['exclude'] = self.exclude
-            if self.count >= 0:
-                self.h['count'] = self.count
-            if self.to is not None:
-                self.h['to'] = self.to
-            if self.regex_flags is not None:
-                self.h['regex-flags'] = self.regex_flags
-            for (k, v) in self.extra.items():
-                self.h[k] = v
-        return self.h
-
-
+                if pastie is not None:
+                    del(pastie)
+                    # signals to queue job is done
+                    self.queue.task_done()
+        logger.info('{}: exited'.format(self.name))
 
 class StorageScheduler():
     def __init__(self, storage, **kwargs):
@@ -275,626 +195,37 @@ class StorageDispatcher():
         logger.debug('Pastie[{0}] unknown'.format(pastie_id))
         return False
 
+def load_config(config):
 
-class PastieStorage():
-    def __init__(self, **kwargs):
-        self.name = kwargs.get('name', self.__class__.__name__)
-        self.lookup = kwargs.get('lookup', False)
-        try:
-            logger.debug('{0}: initializing storage backend'.format(self.name))
-            self.__init_storage__(**kwargs)
-        except Exception as e:
-            logger.error('{0}: unable to initialize storage backend: {1}'.format(self.name, e))
-            raise
+    logger.debug("About to load configuration")
 
-    def format_directory(self, directory):
-        d = datetime.now()
-        year = str(d.year)
-        month = str(d.month)
-        # prefix month and day with "0" if it is only one digit
-        if len(month) < 2:
-            month = "0" + month
-        day = str(d.day)
-        if len(day) < 2:
-            day = "0" + day
-        return directory + os.sep + year + os.sep + month + os.sep + day
-
-    def __init_storage__(self, **kwargs):
-        raise NotImplementedError
-
-    def __save_pastie__(self, pastie):
-        raise NotImplementedError
-
-    def save_pastie(self, pastie):
-        try:
-            start = time.time()
-            logger.debug('{0}: saving pastie[{1}]'.format(self.name, pastie.id))
-            self.__save_pastie__(pastie)
-            delta = time.time() - start
-            logger.debug('{0}: pastie[{1}] saved in {2}s'.format(self.name, pastie.id, delta))
-        except Exception as e:
-            logger.error('{0}: unable to save pastie[{1}]: {2}'.format(self.name, pastie.id, e))
-            raise
-
-    def __seen_pastie__(self, pastie_id, **kwargs):
-        raise NotImplementedError
-
-    def seen_pastie(self, pastie_id, **kwargs):
-        if not self.lookup:
-            return False
-        try:
-            start = time.time()
-            logger.debug('{0}: looking up pastie[{1}]'.format(self.name, pastie_id))
-            res = self.__seen_pastie__(pastie_id, **kwargs)
-            delta = time.time() - start
-            logger.debug('{0}: pastie[{1}] looked-up in {2}s'.format(self.name, pastie_id, delta))
-            return res
-        except Exception as e:
-            logger.error('{0}: unable to lookup pastie[{1}]: {2}'.format(self.name, pastie_id, e))
-            raise
-
-
-class FileStorage(PastieStorage):
-
-    def format_directory(self, directory):
-        full_path = PastieStorage.format_directory(self, directory)
-        if not os.path.isdir(full_path):
-            os.makedirs(full_path)
-        return full_path
-
-    def __init_storage__(self, **kwargs):
-        self.save_dir = kwargs.get('save_dir')
-        if self.save_dir is not None:
-            if not os.path.exists(self.save_dir):
-                os.makedirs(self.save_dir)
-        self.archive_dir = kwargs.get('archive_dir')
-        if self.archive_dir is not None:
-            if not os.path.exists(self.archive_dir):
-                os.makedirs(self.archive_dir)
-
-    def __save_pastie__(self, pastie):
-        directories = []
-        full_path = None
-        directories.append(self.archive_dir)
-        if pastie.matched:
-            directories.append(self.save_dir)
-        for directory in directories:
-            if directory is None:
-                continue
-            directory = directory + os.sep + pastie.site.name
-            full_path = self.format_directory(directory) + os.sep + pastie.filename
-            logger.debug('Site[{site}]: Writing pastie[{id}][{disk}] to disk.'.format(site=pastie.site.name, id=pastie.id, disk=full_path))
-            if pastie.site.archive_compress:
-                with gzip.open(full_path, 'wb') as f:
-                    f.write(pastie.pastie_content)
-            else:
-                with open(full_path, 'wb') as f:
-                    f.write(pastie.pastie_content)
-            # Writing pastie metadata in a separate file if they exist
-            if pastie.pastie_metadata:
-                logger.debug('Site[{site}]: Writing pastie[{id}][{disk}] metadata to disk.'.format(site=pastie.site.name, id=pastie.id, disk=full_path))
-                with open(full_path + ".metadata", 'wb') as f:
-                    f.write(pastie.pastie_metadata)
-            logger.debug('Site[{site}]: Wrote pastie[{id}][{disk}] to disk.'.format(site=pastie.site.name, id=pastie.id, disk=full_path))
-        return full_path
-
-    def __seen_pastie__(self, pastie_id, **kwargs):
-        try:
-            # check if the pastie was already saved on the disk
-            pastie_filename = kwargs['filename']
-            site_name = kwargs['sitename']
-            for d in [self.save_dir, self.archive_dir]:
-                if d is None:
-                    continue
-                fullpath = self.format_directory(d + os.sep + site_name)
-                fullpath = fullpath + os.sep + pastie_filename
-                logger.debug('{0}: checking if file {1} exists'.format(self.name, fullpath))
-                if os.path.exists(fullpath):
-                    logger.debug('{0}: file {1} exists'.format(self.name, fullpath))
-                    return True
-        except KeyError:
-            pass
-        return False
-
-
-class RedisStorage(PastieStorage):
-    def __getconn(self):
-        # LATER: implement pipelining
-        return redis.StrictRedis(host=self.server, port=self.port, db=self.database)
-
-    def __init_storage__(self, **kwargs):
-        self.save_dir = kwargs['save_dir']
-        self.archive_dir = kwargs['archive_dir']
-        self.server = kwargs['redis_server']
-        self.port = kwargs['redis_port']
-        self.database = kwargs['redis_database']
-        self.queue_all = kwargs['redis_queue_all']
-        r = self.__getconn()
-        r.ping()
-
-    def __save_pastie__(self, pastie):
-        directories = []
-        directories.append(self.archive_dir)
-        if pastie.matched:
-            directories.append(self.save_dir)
-        for directory in directories:
-            if directory is None:
-                continue
-            directory = directory + os.sep + pastie.site.name
-            full_path = self.format_directory(directory) + os.sep + pastie.filename
-            if pastie.matched or self.queue_all:
-                self.__getconn().lpush('pastes', full_path)
-                logger.debug('Site[{site}]: Sent pastie[{id}][{disk}] to redis.'.format(site=pastie.site.name, id=pastie.id, disk=full_path))
-
-
-class MongoStorage(PastieStorage):
-    def __init_storage__(self, **kwargs):
-        self.url = kwargs['url']
-        self.database = kwargs['database']
-        self.collection = kwargs['collection']
-        self.user = kwargs.get('user')
-        self.password = kwargs.get('password')
-        self.save_all = kwargs.get('save_all', False)
-        self.save_site = kwargs.get('save_site', False)
-        self.save_url = kwargs.get('save_url', False)
-        self.save_id = kwargs.get('save_pastie_id', False)
-        self.save_timestamp = kwargs.get('save_timestamp', False)
-        self.save_content_on_miss = kwargs.get('save_content_on_miss', False)
-        self.save_matched = kwargs.get('save_matched', False)
-        self.save_filename = kwargs.get('save_filename', False)
-        self.client = MongoClient(self.url)
-        self.db = self.client[self.database]
-        if self.user and self.password:
-            try:
-                self.db.authenticate(name=self.user, password=self.password)
-            except Exception:
-                logger.error("ERROR: authentication to mongodb failed")
-                raise
-        self.client.server_info()
-        self.col = self.db[self.collection]
-
-    def __save_pastie__(self, pastie):
-        if (not pastie.matched) and (not self.save_all):
-            return
-        data = {'hash': pastie.md5}
-        if self.save_timestamp:
-            data['timestamp'] = datetime.utcnow()
-        if self.save_url:
-            data['url'] = pastie.public_url
-        if self.save_site:
-            data['site'] = pastie.site.name
-        if self.save_id:
-            data['pastie_id'] = pastie.id
-        if self.save_matched:
-            data['matched'] = pastie.matched
-        if self.save_filename:
-            data['filename'] = pastie.filename
-        if pastie.matched:
-            data['content'] = pastie.pastie_content
-            data['matches'] = pastie.matches_to_dict()
-        elif self.save_content_on_miss:
-            data['content'] = pastie.pastie_content
-        self.col.insert(data)
-
-    def __seen_pastie__(self, pastie_id, **kwargs):
-        # check if the pastie was already saved in mongo
-        try:
-            if self.save_id and self.save_site:
-                site = kwargs['site']
-                return self.col.find_one({'pastie_id': pastie_id, 'site': site})
-            if self.save_url:
-                url = kwargs['url']
-                return self.col.find_one({'url': url})
-            logger.error('{0}: Not enough meta-data saved, disabling lookup'.format(self.name))
-            self.lookup = False
-        except KeyError:
-            pass
-        except TypeError as e:
-            logger.error('{0}: Invalid query parameters: {1}'.format(self.name, e))
-            pass
-        except Exception as e:
-            logger.error('{0}: Invalid query, disabling lookup: {1}'.format(self.name, e))
-            self.lookup = False
-        return False
-
-
-class TelegramStorage(PastieStorage):
-
-    def __init_storage__(self, **kwargs):
-        self.token = kwargs.get('token')
-        self.chat_id = kwargs.get('chat_id')
-
-    def __save_pastie__(self, pastie):
-        if pastie.matched:
-            message = '''
-I found a hit for a regular expression on one of the pastebin sites.
-
-The site where the paste came from :        {site}
-The original paste was located here:        {url}
-And the regular expressions that matched:   {matches}
-
-Below (after newline) is the content of the pastie:
-
-{content}
-
-        '''.format(site=pastie.site.name, url=pastie.public_url, matches=pastie.matches_to_regex(), content=pastie.pastie_content.decode('utf8'))
-
-            url = 'https://api.telegram.org/bot{0}/sendMessage'.format(self.token)
-            try:
-                logger.debug('Sending message to telegram {} for pastie_id {}'.format(url, pastie.id))
-                requests.post(url, data={'chat_id': self.chat_id, 'text': message})
-            except Exception as e:
-                logger.warning("Failed to alert through telegram: {0}".format(e))
-
-
-class Sqlite3Storage(PastieStorage):
-    def __connect__(self):
-        thread_id = threading.current_thread().ident
-        try:
-            with self.lock:
-                cursor = self.connections[thread_id]
-        except KeyError:
-            logger.debug('Re-opening Sqlite databse {0} in thread[{1}]'.format(self.filename, thread_id))
-            # autocommit and write ahead logging
-            # works well because we have only 1 writter for n readers
-            db_conn = sqlite3.connect(self.filename, isolation_level=None)
-            db_conn.execute('pragma journal_mode=wal')
-            cursor = db_conn.cursor()
-            with self.lock:
-                self.connections[thread_id] = cursor
-        return cursor
-
-    def __init_storage__(self, **kwargs):
-        self.filename = kwargs['filename']
-        logger.info('Opening Sqlite database {0}'.format(self.filename))
-        self.connections = {}
-        self.lock = threading.Lock()
-        # create the db if it doesn't exist
-        try:
-            # LATER maybe create a table per site. Lookups will be faster as less text-searching is needed
-            self.__connect__().execute('''
-                CREATE TABLE IF NOT EXISTS pasties (
-                    site TEXT,
-                    id TEXT,
-                    md5 TEXT,
-                    url TEXT,
-                    local_path TEXT,
-                    timestamp DATE,
-                    matches TEXT
-                    )''')
-            # self.db_conn.commit()
-        except sqlite3.DatabaseError as e:
-            raise Exception('Problem with SQLite database {0}: {1}'.format(self.filename, e))
-
-    def __save_pastie__(self, pastie):
-        if self.__seen_pastie__(pastie.id, site_name=pastie.site.name):
-            self.__update(pastie)
-        else:
-            self.__add(pastie)
-
-    def __seen_pastie__(self, pastie_id, **kwargs):
-        try:
-            cursor = self.__connect__()
-            site_name = kwargs['sitename']
-            data = {'site': site_name, 'id': pastie_id}
-            cursor.execute('SELECT count(id) FROM pasties WHERE site=:site AND id=:id', data)
-            pastie_in_db = cursor.fetchone()
-            logger.debug('seen {0} in sqlite?: {1}'.format(
-                pastie_id, pastie_in_db and pastie_in_db[0]))
-            return pastie_in_db and pastie_in_db[0]
-        except KeyError:
-            pass
-        return False
-
-    def __add(self, pastie):
-        try:
-            data = {'site': pastie.site.name,
-                    'id': pastie.id,
-                    'md5': pastie.md5,
-                    'url': pastie.url,
-                    'local_path': pastie.site.archive_dir + os.sep + pastie.filename,
-                    'timestamp': datetime.now(),
-                    'matches': pastie.matches_to_text()
-                    }
-            self.__connect__().execute('INSERT INTO pasties VALUES (:site, :id, :md5, :url, :local_path, :timestamp, :matches)', data)
-            # self.db_conn.commit()
-        except sqlite3.DatabaseError as e:
-            logger.error('Cannot add pastie {site} {id} in the SQLite database: {error}'.format(site=pastie.site.name, id=pastie.id, error=e))
-            raise
-        logger.debug('Added pastie {site} {id} in the SQLite database.'.format(site=pastie.site.name, id=pastie.id))
-
-    def __update(self, pastie):
-        try:
-            data = {'site': pastie.site.name,
-                    'id': pastie.id,
-                    'md5': pastie.md5,
-                    'url': pastie.url,
-                    'local_path': pastie.site.archive_dir + os.sep + pastie.filename,
-                    'timestamp': datetime.now(),
-                    'matches': pastie.matches_to_text()
-                    }
-            self.__connect__().execute('''UPDATE pasties SET md5 = :md5,
-                                            url = :url,
-                                            local_path = :local_path,
-                                            timestamp  = :timestamp,
-                                            matches = :matches
-                     WHERE site = :site AND id = :id''', data)
-            # self.db_conn.commit()
-        except sqlite3.DatabaseError as e:
-            logger.error('Cannot add pastie {site} {id} in the SQLite database: {error}'.format(site=pastie.site.name, id=pastie.id, error=e))
-            raise
-        logger.debug('Updated pastie {site} {id} in the SQLite database.'.format(site=pastie.site.name, id=pastie.id))
-
-
-def load_user_agents_from_file(filename):
-    global user_agents_list
-    try:
-        ualist = []
-        logger.debug('Loading user-agent from file "{file}" ...'.format(file=filename))
-        with open(filename) as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    ualist.append(line)
-        logger.debug('Found {count} UserAgents in file "{file}"'.format(file=filename, count=len(ualist)))
-        user_agents_list = ualist
-    except Exception as e:
-        logger.error('Configuration problem: user-agent-file "{file}" not found or not readable: {e}'.format(file=filename, e=e))
-        pass
-
-def parse_config_file(configfile, debug):
-    global yamlconfig
-    global proxies_list
-    global ip_addr
-    global sendmail
-    try:
-        yamlconfig = yaml.load(open(configfile), Loader=yaml.FullLoader)
-    except yaml.YAMLError as exc:
-        logger.error("Error in configuration file:")
-        if hasattr(exc, 'problem_mark'):
-            mark = exc.problem_mark
-            logger.error("error position: (%s:%s)" % (mark.line + 1, mark.column + 1))
-            exit(1)
-    if not debug and 'logging-level' in yamlconfig:
-        if yamlconfig['logging-level'] in ['NOTSET', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
-            logger.setLevel(logging.getLevelName(yamlconfig['logging-level']))
-        else:
-            logger.error("logging level \"%s\" is invalid" % (yamlconfig['logging-level']))
-    # TODO verify validity of all config parameters
-    for includes in yamlconfig.get("includes", []):
-        yamlconfig.update(yaml.load(open(includes)))
-    if yamlconfig['proxy']['random']:
-        proxies_list = ProxyList(yamlconfig['proxy']['file'])
-    if yamlconfig['user-agent']['random']:
-        load_user_agents_from_file(yamlconfig['user-agent']['file'])
-
-    try:
-        ip_addr = yamlconfig['network']['ip']
-    except:
-        logger.debug("Using default IP address")
-        pass
-
-    try:
-        email=yamlconfig.get('email', {})
-        if email.get('alert'):
-            sendmail = PystemonSendmail(email['from'], email['to'], email['subject'],
-                    server=email.get('server', '127.0.0.1'),
-                    port=email.get('port', 25),
-                    tls=email.get('tls', False),
-                    username=email.get('username'),
-                    password=email.get('password'),
-                    size_limit=email.get('size-limit', 1024*1024))
-            logger.debug("alert emails will be sent to '{0}' from '{1}' via '{2}'".format(sendmail.mailto, sendmail.mailfrom, sendmail.server))
-    except Exception as e:
-        logger.error("Unable to parse email configuration: {}".format(str(e)))
-
-    # initialize database backends
-    storage_engines = []
-    archive = yamlconfig.get('archive', {})
-    save_dir = None
-    archive_dir = None
-    try:
-        if archive['save'] or archive['save-all']:
-            if archive['save']:
-                save_dir = archive['dir']
-            else:
-                save_dir = None
-            if archive['save-all']:
-                archive_dir = archive['dir-all']
-            else:
-                archive_dir = None
-        if archive['save'] or archive['save-all']:
-            storage_engines.append(FileStorage(
-                lookup=True,
-                save_dir=save_dir,
-                archive_dir=archive_dir))
-    except Exception as e:
-        exit('ERROR: Unable to initialize file storage: {0}'.format(e))
-
-    try:
-        if (save_dir is not None) or (archive_dir is not None):
-            redis_config = yamlconfig.get('redis', {})
-            if redis_config.get('queue', False):
-                global redis
-                import redis
-                redis_server = redis_config['server']
-                redis_port = redis_config['port']
-                redis_database = redis_config['database']
-                redis_queue_all = redis_config.get('queue-all', False)
-                redis_lookup = redis_config.get('lookup', False)
-                storage_engines.append(RedisStorage(
-                    redis_server=redis_server,
-                    redis_port=redis_port,
-                    redis_database=redis_database,
-                    redis_queue_all=redis_queue_all,
-                    lookup=redis_lookup,
-                    save_dir=save_dir,
-                    archive_dir=archive_dir))
-    except ImportError:
-        exit('ERROR: Cannot import the redis Python library. Are you sure it is installed?')
-    except KeyError as e:
-        exit('ERROR: Missing configuration directive for redis: {0}'.format(e))
-    except Exception as e:
-        exit('ERROR: Unable to initialize redis storage: {0}'.format(e))
-
-    try:
-        if yamlconfig['db'] and yamlconfig['db']['sqlite3'] and yamlconfig['db']['sqlite3']['enable']:
-            global sqlite3
-            import sqlite3
-            storage_engines.append(Sqlite3Storage(
-                filename=yamlconfig['db']['sqlite3']['file'],
-                lookup=yamlconfig['db']['sqlite3'].get('lookup', False)))
-    except KeyError:
-        logger.debug("No sqlite3 database requested")
-    except ImportError:
-        exit('ERROR: Cannot import the sqlite3 Python library. Are you sure it is compiled in python?')
-    except Exception as e:
-        exit('ERROR: Cannot initialize the sqlite3 database: {0}'.format(e))
-
-    try:
-        if yamlconfig['telegram']['enable']:
-            storage_engines.append(TelegramStorage(
-                token=yamlconfig['telegram']['token'],
-                chat_id=yamlconfig['telegram']['chat-id']))
-    except KeyError:
-        logger.debug("No telegram alerting requested")
-    except Exception as e:
-        exit('ERROR: Cannot initialize the telegram alerting: {0}'.format(e))
-
-    try:
-        mongo_config = yamlconfig.get('mongo', {})
-        save_all = mongo_config.get('save-all', False)
-        if mongo_config.get('save', False) or save_all:
-            try:
-                global MongoClient
-                from pymongo import MongoClient
-                global PyMongoError
-                from pymongo.errors import PyMongoError
-                mongo_url = mongo_config['url']
-                mongo_database = mongo_config['database']
-                mongo_collection = mongo_config['collection']
-                mongo_user = mongo_config.get('user')
-                mongo_password = mongo_config.get('password')
-                mongo_profile = mongo_config.get('save-profile', {})
-                mongo_save_site = mongo_profile.get('site', False)
-                mongo_save_url = mongo_profile.get('url', False)
-                mongo_save_pastie_id = mongo_profile.get('id', False)
-                mongo_save_timestamp = mongo_profile.get('timestamp', False)
-                mongo_save_content_on_miss = mongo_profile.get('content-on-miss', False)
-                mongo_save_matched = mongo_profile.get('matched', False)
-                mongo_lookup_seen = mongo_config.get('lookup', False)
-                storage_engines.append(MongoStorage(
-                    url=mongo_url, database=mongo_database, collection=mongo_collection,
-                    user=mongo_user, password=mongo_password,
-                    save_all=save_all,
-                    save_site=mongo_save_site,
-                    save_url=mongo_save_url,
-                    save_pastie_id=mongo_save_pastie_id,
-                    save_matched=mongo_save_matched,
-                    save_timestamp=mongo_save_timestamp,
-                    save_content_on_miss=mongo_save_content_on_miss,
-                    lookup=mongo_lookup_seen))
-            except PyMongoError as e:
-                exit('ERROR: Unable to contact db: %s' % e)
-    except ImportError:
-        exit('ERROR: Cannot import PyMongo. Are you sure it is installed ?')
-    except KeyError as e:
-        exit('ERROR: Missing configuration directive for mongo: {0}'.format(e))
-    except Exception as e:
-        exit('ERROR: Unable to initialize mongo storage: {0}'.format(e))
-
-    return storage_engines
-
-
-def cleanup(signal, frame):
-    global threads
-    for t in threads:
-        t.kill_received = True
-
-def main(storage_engines):
-    global queues
-    global threads
-    global patterns
-    global proxies_list
-    global user_agents_list
-    global ip_addr
-    global sendmail
+    threads=[]
     queues = {}
-    threads = []
-    patterns = []
+    config.reload()
 
-    # load the regular expression engine
-    engine = yamlconfig.get('engine', 're')
-    if engine == 're':
-        import re
-    elif engine == 'regex':
-        try:
-            global re
-            logger.debug("Loading alternative 'regex' engine ...")
-            import regex as re
-            re.DEFAULT_VERSION = re.VERSION1
-            logger.debug("Successfully loaded 'regex' engine")
-        except ImportError as e:
-            exit("ERROR: Unable to import 'regex' engine: %s" % e)
-    else:
-        exit("ERROR: Invalid regex engine '%s' specified" % engine)
+    if config.proxies_list is not None:
+        threads.append(config.proxies_list.monitor())
 
-    # compile all search patterns
-    strict = yamlconfig.get('strict_regex', False)
-    for regex in yamlconfig['search']:
-        try:
-            search = regex['search']
-            ps = PastieSearch(regex)
-            patterns.append(ps)
-        except KeyError:
-            if strict:
-                exit("Error: Missing search pattern")
-            else:
-                logger.error("Error: skipping empty search pattern entry")
-        except Exception as e:
-            if strict:
-                exit("Error: Unable to parse regex '%s': %s" % (search, e))
-            else:
-                logger.error("Error: Unable to parse regex '%s': %s" % (search, e))
-
-    # start thread for proxy file listener
-    if yamlconfig['proxy']['random']:
-        t = proxies_list.monitor()
-        threads.append(t)
-
-    save_thread = yamlconfig.get('save-thread', False)
     storage = StorageDispatcher()
-    if storage_engines:
-        if save_thread:
+    if config.storage_engines:
+        if config.save_thread:
             logger.info("Pasties will be saved asynchronously")
         else:
             logger.info("Pasties will be saved synchronously")
+        for db in config.storage_engines:
+            # start the threads handling database storage if needed
+            if config.save_thread:
+                t = StorageThread(db)
+                threads.append(t)
+                storage.add_storage(t)
+                t.setDaemon(True)
+                t.start()
+            # save pasties synchronously
+            else:
+                s = StorageSync(db)
+                storage.add_storage(s)
     else:
         logger.info("Pasties will not be saved")
-    for db in storage_engines:
-        # start the threads handling database storage if needed
-        if save_thread:
-            t = StorageThread(db)
-            threads.append(t)
-            storage.add_storage(t)
-            t.setDaemon(True)
-            t.start()
-        # save pasties synchronously
-        else:
-            s = StorageSync(db)
-            storage.add_storage(s)
-
-    # Build array of enabled sites.
-    sites_enabled = []
-    for site in yamlconfig['site']:
-        if yamlconfig['site'][site].get('enable'):
-            logger.info("Site: {} is enabled, adding to pool...".format(site))
-            sites_enabled.append(site)
-        elif yamlconfig['site'][site].get('enable') is False:
-            logger.info("Site: {} is disabled.".format(site))
-        else:
-            logger.warning("Site: {} is not enabled or disabled in config file. We just assume it disabled.".format(site))
-
 
     '''
      for each site enabled:
@@ -904,86 +235,158 @@ def main(storage_engines):
      - create a thread to download the pasties (consumer)
      - if needed, create a thread to throttle all the other threads (producer)
     '''
-    for site in sites_enabled:
+    for site in config.sites:
         try:
 
-            site_download_url = yamlconfig['site'][site]['download-url']
-            site_archive_url = yamlconfig['site'][site]['archive-url']
-            site_archive_regex = yamlconfig['site'][site]['archive-regex']
-            site_throttling = yamlconfig['site'][site].get('throttling', 0)
-
             throttler = None
-            if site_throttling > 0:
-                logger.debug("enabling throttling on site {site}".format(site=site))
-                throttler = ThreadThrottler(site, site_throttling)
+            if site.throttling > 0:
+                logger.debug("enabling throttling on site {site}".format(site=site.name))
+                throttler = ThreadThrottler(site.name, site.throttling)
                 threads.append(throttler)
                 throttler.setDaemon(True)
                 throttler.start()
 
-            queues[site] = Queue()
+            queues[site.name] = Queue()
 
-            for i in range(yamlconfig['threads']):
-                user_agent = PystemonUA(proxies_list, user_agents_list=user_agents_list, throttler=throttler, ip_addr=ip_addr)
-                t = ThreadPasties(user_agent, queue_name=site, queue=queues[site])
+            for i in range(config.threads):
+                name = "[ThreadPasties][{}][{}]".format(site.name, i+1)
+                user_agent = PystemonUA(name, config.proxies_list,
+                        user_agents_list = config.user_agents_list,
+                        throttler=throttler, ip_addr=config.ip_addr)
+                t = ThreadPasties(user_agent, queue_name=site.name, queue=queues[site.name])
                 threads.append(t)
                 t.setDaemon(True)
                 t.start()
 
-            t = PastieSite(site, site_download_url, site_archive_url, site_archive_regex,
-                           site_public_url=yamlconfig['site'][site].get('public-url'),
-                           site_metadata_url=yamlconfig['site'][site].get('metadata-url'),
-                           site_update_min=yamlconfig['site'][site].get('update-min', 10),
-                           site_update_max=yamlconfig['site'][site].get('update-max', 30),
-                           site_pastie_classname=yamlconfig['site'][site].get('pastie-classname'),
-                           site_save_dir=yamlconfig['archive'].get('dir'),
-                           site_archive_dir=yamlconfig['archive'].get('dir-all'),
-                           site_ua=PystemonUA(proxies_list, user_agents_list=user_agents_list, throttler=throttler, ip_addr=ip_addr),
-                           site_queue=queues[site],
-                           patterns=patterns,
-                           sendmail=sendmail,
-                           re=re,
-                           archive_compress=yamlconfig['archive'].get('compress', False))
+            # XXX compressed is used to guess the filename, so it's mandatory
+            name = "[PastieSite][{}]".format(site.name)
+            site_ua=PystemonUA(name, config.proxies_list,
+                user_agents_list = config.user_agents_list,
+                throttler = throttler, ip_addr = config.ip_addr)
+            t = PastieSite(site.name, site.download_url, site.archive_url, site.archive_regex,
+                    site_public_url = site.public_url,
+                    site_metadata_url = site.metadata_url,
+                    site_update_min = site.update_min,
+                    site_update_max = site.update_max,
+                    site_pastie_classname = site.pastie_classname,
+                    site_save_dir = config.save_dir,
+                    site_archive_dir = config.archive_dir,
+                    archive_compress = config.compress,
+                    site_ua=site_ua,
+                    site_queue=queues[site.name],
+                    patterns=config.patterns,
+                    sendmail=config.sendmail,
+                    re=config.re_module)
             t.set_storage(storage)
             threads.append(t)
             t.setDaemon(True)
             t.start()
-
         except Exception as e:
-            logger.error('Unable to initialize pastie site {0}: {1}'.format(site, e))
+            logger.error('Unable to initialize pastie site {0}: {1}'.format(site.name, e))
 
-    signal.signal(signal.SIGTERM, cleanup)
+    logger.debug("Finished loading configuration, {} thread(s) started".format(len(threads)))
+    return threads
+
+def stop_threads(threads):
+    count = len(threads)
+    if not count > 0:
+        return
+    logger.debug("stopping {0} thread(s) ...".format(len(threads)))
+    for t in threads:
+        t.stop()
+
+def join_threads(threads, timeout=None, stop_requested=False):
+    count = len(threads)
+    if not count > 0:
+        return True
+    joined = 0
+    terminated = 0
+    if stop_requested:
+        logger.debug("joining {} threads ...".format(count))
+    else:
+        logger.debug("checking on {} threads ...".format(count))
+    if timeout is not None:
+        logger.debug("will wait maximum {}s for each thread".format(timeout))
+    for t in threads:
+        try:
+            t.join(timeout)
+            joined = joined + 1
+            if not t.is_alive():
+                terminated = terminated + 1
+        except PystemonException:
+            raise
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            logger.error("failed to join thread '{0}': {1}".format(t, e))
+            pass
+    if stop_requested:
+        logger.debug("{0}/{1} thread(s) terminated".format(terminated, count))
+    else:
+        logger.debug("{0}/{1} thread(s) still alive".format(count-terminated, count))
+    return terminated == count
+
+def main(config):
+    res = 0
+
+    reload_requested = True
+    stop_requested = False
+    threads = []
+
+    def request_stop(signal, frame):
+        raise PystemonStopRequested("stop requested")
+    signal.signal(signal.SIGTERM, request_stop)
+
+    def request_reload(signal, frame):
+        raise PystemonReloadRequested("reload requested")
+    signal.signal(signal.SIGHUP, request_reload)
+
+
     # wait while all the threads are running and someone sends CTRL+C
     while True:
         try:
-            for t in threads:
-                t.join(1)
-        except KeyboardInterrupt:
-            print('')
-            print("Ctrl-c received! Sending kill to threads...")
-            for t in threads:
-                t.kill_received = True
-            logger.info('exiting')
-            exit(0)  # quit immediately
+            if not len(threads) > 0:
+                raise PystemonReloadRequested("Starting up ...")
+            join_threads(threads, timeout=1)
+        except PystemonReloadRequested as e:
+            logger.info("Pystemon[{}]: {}".format(os.getpid(), e))
+            stop_threads(threads)
+            join_threads(threads, stop_requested=True)
+            threads = load_config(config)
+            pass
+        except (PystemonStopRequested, KeyboardInterrupt) as e:
+            if isinstance(e, PystemonException):
+                logger.info("Pystemon[{}]: {}".format(os.getpid(), e))
+            else:
+                print('')
+                print("Ctrl-c received! Sending kill to threads...")
+            stop_threads(threads)
+            join_threads(threads, timeout=max(1, config.max_throttling / 1000), stop_requested=stop_threads)
+            break
+        except Exception as e:
+            logger.error('pystemon crashed: {}'.format(e))
+            res = 1
+            break
+    logger.info('exiting')
+    exit(res)
 
-def main_as_daemon(storage_engines):
+def main_as_daemon(config):
     try:
         # Store the Fork PID
         pid = os.fork()
-
         if pid > 0:
-            pid_file = open(yamlconfig['pid']['filename'], 'w')
-            pid_file.write(str(pid))
-            pid_file.close()
+            pid_file = config.pidfile
+            if pid_file is not None:
+                pid_file = open(pid_file, 'w')
+                pid_file.write(str(pid))
+                pid_file.close()
             print('pystemon started as daemon')
             print('PID: %d' % pid)
             os._exit(0)
-
     except OSError as error:
         logger.error('Unable to fork, can\'t run as daemon. Error: {id} {error}'.format(id=error.errno, error=error.strerror))
         os._exit(1)
-
-    logger.info('Starting up ...')
-    main(storage_engines)
+    main(config)
 
 if __name__ == "__main__":
     global logger
@@ -1040,21 +443,31 @@ if __name__ == "__main__":
         hdlr.setFormatter(formatter)
         logger.addHandler(hdlr)
 
-    storage_engines = parse_config_file(options.config, options.debug)
-    # run the software
+    config = None
+    try:
+        config = PystemonConfig(options.config, options.debug)
+    except Exception as e:
+        logger.error("unable to load configuration: {}".format(e))
+        os._exit(1)
+
+    # stop the software
     if options.kill:
-        if os.path.isfile(yamlconfig['pid']['filename']):
-            f = open(yamlconfig['pid']['filename'], 'r')
+        pidfile = config.pidfile()
+        if os.path.isfile(pidfile):
+            f = open(pidfile, 'r')
             pid = f.read()
             f.close()
-            os.remove(yamlconfig['pid']['filename'])
+            os.remove(pidfile)
             print("Sending signal to pid: {}".format(pid))
             os.kill(int(pid), 2)
             os._exit(0)
         else:
             print("PID file not found. Nothing to do.")
             os._exit(0)
+
+    # run the software
     if options.daemon:
-        main_as_daemon(storage_engines)
+        main_as_daemon(config)
     else:
-        main(storage_engines)
+        main(config)
+
