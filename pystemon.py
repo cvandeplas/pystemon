@@ -39,7 +39,7 @@ from pystemon.pastiesite import PastieSite
 from pystemon.sendmail import PystemonSendmail
 from pystemon.storage import PastieStorage
 from pystemon.config import PystemonConfig
-from pystemon.exception import PystemonException,PystemonStopRequested,PystemonReloadRequested
+from pystemon.exception import *
 
 try:
     from urllib.error import HTTPError, URLError
@@ -219,7 +219,6 @@ def load_config(config):
                 threads.append(t)
                 storage.add_storage(t)
                 t.setDaemon(True)
-                t.start()
             # save pasties synchronously
             else:
                 s = StorageSync(db)
@@ -244,7 +243,6 @@ def load_config(config):
                 throttler = ThreadThrottler(site.name, site.throttling)
                 threads.append(throttler)
                 throttler.setDaemon(True)
-                throttler.start()
 
             queues[site.name] = Queue()
 
@@ -256,7 +254,6 @@ def load_config(config):
                 t = ThreadPasties(user_agent, queue_name=site.name, queue=queues[site.name])
                 threads.append(t)
                 t.setDaemon(True)
-                t.start()
 
             # XXX compressed is used to guess the filename, so it's mandatory
             name = "[PastieSite][{}]".format(site.name)
@@ -280,18 +277,23 @@ def load_config(config):
             t.set_storage(storage)
             threads.append(t)
             t.setDaemon(True)
-            t.start()
         except Exception as e:
             logger.error('Unable to initialize pastie site {0}: {1}'.format(site.name, e))
 
-    logger.debug("Finished loading configuration, {} thread(s) started".format(len(threads)))
+    logger.debug("Finished loading configuration, {} thread(s) to start".format(len(threads)))
     return threads
+
+def start_threads(threads):
+    count = len(threads)
+    logger.debug("starting {0} thread(s) ...".format(count))
+    for t in threads:
+        t.start()
 
 def stop_threads(threads):
     count = len(threads)
     if not count > 0:
         return
-    logger.debug("stopping {0} thread(s) ...".format(len(threads)))
+    logger.debug("stopping {0} thread(s) ...".format(count))
     for t in threads:
         t.stop()
 
@@ -350,10 +352,18 @@ def main(config):
             join_threads(threads, timeout=1)
         except PystemonReloadRequested as e:
             logger.info("Pystemon[{}]: {}".format(os.getpid(), e))
-            stop_threads(threads)
-            join_threads(threads, stop_requested=True)
-            threads = load_config(config)
-            pass
+            try:
+                new_threads = load_config(config)
+                stop_threads(threads)
+                join_threads(threads, stop_requested=True)
+                threads = new_threads
+                start_threads(threads)
+            except PystemonConfigException as e:
+                if not len(threads) > 0:
+                    raise
+                logger.error('Pystemon[{}]: {}'.format(os.getpid(), e))
+                logger.info('Pystemon[{}]: continuing with previous configuration'.format(os.getpid()))
+                pass
         except (PystemonStopRequested, KeyboardInterrupt) as e:
             if isinstance(e, PystemonException):
                 logger.info("Pystemon[{}]: {}".format(os.getpid(), e))
@@ -363,8 +373,12 @@ def main(config):
             stop_threads(threads)
             join_threads(threads, timeout=max(1, config.max_throttling / 1000), stop_requested=stop_threads)
             break
+        except PystemonConfigException as e:
+            logger.error('Pystemon[{}]: {}'.format(os.getpid(), e))
+            res = 2
+            break
         except Exception as e:
-            logger.error('pystemon crashed: {}'.format(e))
+            logger.error('Pystemon crashed: {}'.format(e))
             res = 1
             break
     logger.info('exiting')

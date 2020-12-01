@@ -167,8 +167,10 @@ class PystemonConfig():
                 for site in self._sites:
                     if self._max_throttling < site.throttling:
                         self._max_throttling = site.throttling
+        except PystemonConfigException:
+            raise
         except Exception as e:
-            raise PystemonConfigException('Unable to parse configuration: {0}'.format(e))
+            raise PystemonConfigException('Unable to parse configuration: {}'.format(e))
         logger.debug("configuration loaded")
         return True
 
@@ -198,7 +200,7 @@ class PystemonConfig():
             try:
                 config['user_agents_list'] = self._load_user_agents_from_file(yamlconfig['user-agent']['file'])
             except KeyError:
-                raise RuntimeError('random user-agent requested but no file provided')
+                raise PystemonConfigException('random user-agent requested but no file provided')
 
         try:
             ip_addr = yamlconfig['network']['ip']
@@ -221,6 +223,7 @@ class PystemonConfig():
         except Exception as e:
             logger.error("invalid threads value specified: {0}".format(e))
             config['threads'] = 1
+            pass
 
         config['sites'] = self._load_sites(yamlconfig)
 
@@ -237,8 +240,8 @@ class PystemonConfig():
         res = False
         try:
             version = yaml.__version__.split('.')
-            if int(version[0]) > 5:
-                if int(version[1]) > 1:
+            if int(version[0]) >= 5:
+                if int(version[1]) >= 1:
                     res = True
         except Exception as e:
             logger.debug("unable to parse PyYaml version: {}".format(e))
@@ -257,13 +260,13 @@ class PystemonConfig():
             logger.error("Error in configuration file {0}:".format(configfile))
             if hasattr(exc, 'problem_mark'):
                 mark = exc.problem_mark
-                raise RuntimeError("error position: (%s:%s)" % (mark.line + 1, mark.column + 1))
+                raise PystemonConfigException("error position: (%s:%s)" % (mark.line + 1, mark.column + 1))
         for includes in yamlconfig.get("includes", []):
             try:
                 logger.debug("loading include '{0}'".format(includes))
                 yamlconfig.update(yaml.load(open(includes)))
             except Exception as e:
-                raise RuntimeError("failed to load '{0}': {1}".format(includes, e))
+                raise PystemonConfigException("failed to load '{0}': {1}".format(includes, e))
         return yamlconfig
 
 
@@ -276,7 +279,7 @@ class PystemonConfig():
                 if line:
                     user_agents_list.append(line)
         if not len(user_agents_list) > 0:
-            raise RuntimeError("found zero valid UserAgents")
+            raise PystemonConfigException("found zero valid UserAgents")
         logger.debug("Found {count} UserAgents in file '{file}'".format(file=filename, count=len(user_agents_list)))
         return user_agents_list
 
@@ -312,7 +315,7 @@ class PystemonConfig():
                 compress = storage_file.compress
                 storage_engines.append(storage_file)
         except KeyError as e:
-            raise RuntimeError('Error: archive was not found under storage, old pystemon.yaml config?')
+            raise PystemonConfigException('archive was not found under storage, old pystemon.yaml config?')
 
         for storage in storage_yamlconfig.keys():
             engine = PastieStorage.load_storage(storage, save_dir=save_dir, archive_dir=archive_dir,
@@ -326,7 +329,7 @@ class PystemonConfig():
         engine = yamlconfig.get('engine', 're')
         re_module = None
         if not engine in ['re', 'regex']:
-            raise RuntimeError("Error: only 're' or 'regex' supported, not '{0}'".format(engine))
+            raise PystemonConfigException("only 're' or 'regex' supported, not '{0}'".format(engine))
         try:
             logger.debug("Loading regular expression engine '{0}'".format(engine))
             re_module=importlib.import_module(engine)
@@ -334,7 +337,7 @@ class PystemonConfig():
                 logger.debug("Setting regex DEFAULT_VERSION to VERSION1")
                 re_module.DEFAULT_VERSION = re.VERSION1
         except ImportError as e:
-            raise RuntimeError("Error: unable to import module '{0}'".format(engine))
+            raise PystemonConfigException("unable to import module '{0}'".format(engine))
         return re_module
 
     def _compile_regex(self, yamlconfig, re_module):
@@ -350,12 +353,12 @@ class PystemonConfig():
                 patterns.append(ps)
             except KeyError:
                 if strict:
-                    raise RuntimeError("Error: Missing search pattern")
+                    raise PystemonConfigException("Missing search pattern")
                 else:
                     logger.error("Error: skipping empty search pattern entry")
             except Exception as e:
                 if strict:
-                    raise RuntimeError("Error: Unable to parse regex '%s': %s" % (search, e))
+                    raise PystemonConfigException("Unable to parse regex '%s': %s" % (search, e))
                 else:
                     logger.error("Error: Unable to parse regex '%s': %s" % (search, e))
         logger.debug("successfully compiled {0}/{1} regexes".format(len(patterns), len(regexes)))
