@@ -16,13 +16,15 @@ class FileStorage(PastieStorage):
 
     def __init_storage__(self, **kwargs):
         self.lookup = True
-        self.save_dir = kwargs.get('save_dir')
+        self.save_dir = kwargs.get('dir')
         if self.save_dir is not None:
             if not os.path.exists(self.save_dir):
+                logger.debug("{}: creating saving directory '{}'".format(self.name, self.save_dir))
                 os.makedirs(self.save_dir)
-        self.archive_dir = kwargs.get('archive_dir')
+        self.archive_dir = kwargs.get('dir-all')
         if self.archive_dir is not None:
             if not os.path.exists(self.archive_dir):
+                logger.debug("{}: creating archive directory '{}'".format(self.name, self.archive_dir))
                 os.makedirs(self.archive_dir)
         self.compress = kwargs.get('compress', False)
 
