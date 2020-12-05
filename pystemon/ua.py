@@ -216,8 +216,10 @@ class PystemonUA():
                     ls=loop_server, ts=self.retries_server,
                     url=url
                 ))
+            now = time.time()
             res = self.__download_url__(url, session, random_proxy)
-            logger.debug('{}: Downloading url: {} done.'.format(self.name, url))
+            time_taken = time.time() - now
+            logger.debug('{}: Downloading url: {} done in {}s.'.format(self.name, url, time_taken))
             response = res.get('response', None)
             if res.get('abort', False):
                 break

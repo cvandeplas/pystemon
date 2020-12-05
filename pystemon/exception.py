@@ -17,3 +17,5 @@ class PystemonStopRequested(PystemonException):
 class PystemonReloadRequested(PystemonException):
     pass
 
+class PystemonQueueStatRequested(PystemonException):
+    pass

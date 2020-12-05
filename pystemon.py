@@ -201,6 +201,10 @@ def main(config):
         raise PystemonReloadRequested("reload requested")
     signal.signal(signal.SIGHUP, request_reload)
 
+    def request_queue_stats(signal, frame):
+        raise PystemonQueueStatRequested("queues stats requested")
+    signal.signal(signal.SIGUSR1, request_queue_stats)
+
 
     # wait while all the threads are running and someone sends CTRL+C
     while True:
@@ -231,6 +235,13 @@ def main(config):
             stop_threads(threads)
             join_threads(threads, timeout=max(1, config.max_throttling / 1000), stop_requested=stop_threads)
             break
+        except PystemonQueueStatRequested as e:
+            logger.debug("{}".format(e))
+            for site in config.sites:
+                try:
+                    logger.info("{}: queue size={}".format(repr(site), site.queue.qsize()))
+                except:
+                    pass
         except PystemonConfigException as e:
             logger.error('Pystemon[{}]: {}'.format(os.getpid(), e))
             res = 2
