@@ -2,11 +2,110 @@
 import logging.handlers
 import time
 import random
+import threading
+import traceback
 import os
 from datetime import datetime
 import importlib
 
+try:
+    from queue import Queue
+    from queue import Full
+    from queue import Empty
+except ImportError:
+    from Queue import Queue
+    from Queue import Full
+    from Queue import Empty
+
 logger = logging.getLogger('pystemon')
+
+class StorageScheduler():
+    def __init__(self, storage, **kwargs):
+        self.storage = storage
+        self.name = self.storage.name
+
+    def save_pastie(self, pastie, timeout):
+        raise NotImplementedError
+
+    def seen_pastie(self, pastie_id, **kwargs):
+        raise NotImplementedError
+
+
+class StorageSync(StorageScheduler):
+    def save_pastie(self, pastie, timeout):
+        self.storage.save_pastie(pastie)
+
+    def seen_pastie(self, pastie_id, **kwargs):
+        return self.storage.seen_pastie(pastie_id, **kwargs)
+
+
+# LATER: implement an async class
+class StorageThread(threading.Thread, StorageScheduler):
+    def __init__(self, storage, **kwargs):
+        threading.Thread.__init__(self)
+        StorageScheduler.__init__(self, storage, **kwargs)
+        try:
+            size = int(kwargs['queue_size'])
+        except Exception:
+            size = 0
+        self.queue = Queue(size)
+        self.kill_received = False
+
+    def run(self):
+        logger.info('{0}: Thread for saving pasties started'.format(self.name))
+        # loop over the queue
+        while not self.kill_received:
+            # pastie = None
+            try:
+                # grabs pastie from queue
+                pastie = self.queue.get(True, 5)
+                # save the pasties in each storage
+                self.storage.save_pastie(pastie)
+            except Empty:
+                pass
+            # catch unknown errors
+            except Exception as e:
+                logger.error("{0}: Thread for saving pasties crashed unexpectectly, recovering...: {1}".format(self.name, e))
+                logger.debug(traceback.format_exc())
+            finally:
+                # to be on the safe side of gf
+                del(pastie)
+                # signals to queue job is done
+                self.queue.task_done()
+        logger.info('{0}: Thread for saving pasties terminated'.format(self.name))
+
+    def save_pastie(self, pastie, timeout):
+        try:
+            logger.debug('{0}: queueing pastie {1} for saving'.format(self.name, pastie.id))
+            self.queue.put(pastie, True, timeout)
+        except Full:
+            logger.error('{0}: unable to save pastie[{1}]: queue is full'.format(self.name, pastie.id))
+
+    # should work as there is 1 write for n readers (and currently n = 1)
+    def seen_pastie(self, pastie_id, **kwargs):
+        return self.storage.seen_pastie(pastie_id, **kwargs)
+
+
+class StorageDispatcher():
+    def __init__(self):
+        self.__storage = []
+        self.lock = threading.Lock()
+
+    def add_storage(self, thread_storage):
+        self.__storage.append(thread_storage)
+
+    def save_pastie(self, pastie, timeout=5):
+        for t in self.__storage:
+            t.save_pastie(pastie, timeout)
+
+    def seen_pastie(self, pastie_id, **kwargs):
+        for t in self.__storage:
+            if t.seen_pastie(pastie_id, **kwargs):
+                logger.debug('{0}: Pastie[{1}] found'.format(t.name, pastie_id))
+                return True
+        logger.debug('Pastie[{0}] unknown'.format(pastie_id))
+        return False
+
 
 class PastieStorage():
 

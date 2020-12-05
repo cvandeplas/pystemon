@@ -1,8 +1,65 @@
 import logging.handlers
 import hashlib
 import time
+import threading
+
+try:
+    from queue import Queue
+    from queue import Full
+    from queue import Empty
+except ImportError:
+    from Queue import Queue
+    from Queue import Full
+    from Queue import Empty
 
 logger = logging.getLogger('pystemon')
+
+class ThreadPasties(threading.Thread):
+    '''
+    Instances of these threads are responsible for downloading the pastes
+    found in the queue.
+    '''
+
+    def __init__(self, user_agent, queue=None, queue_name=None):
+        threading.Thread.__init__(self)
+        self.user_agent = user_agent
+        self.queue = queue
+        self.name = 'ThreadPasties[{}]'.format(queue_name)
+        self.condition = threading.Condition()
+        self.kill_received = False
+
+    def stop(self):
+        with self.condition:
+            logger.info('{}: exiting'.format(self.name))
+            self.kill_received = True
+            self.user_agent.stop()
+            self.condition.notify_all()
+
+    def run(self):
+        logger.info('{}: started'.format(self.name))
+        while True:
+            with self.condition:
+                if self.kill_received:
+                    break
+            pastie = None
+            try:
+                # grabs pastie from queue
+                pastie = self.queue.get(block=True, timeout=1)
+                pastie.fetch_and_process_pastie(self.user_agent)
+            except Empty:
+                pass
+            # catch unknown errors
+            except Exception as e:
+                logger.error("{} crashed unexpectedly, recovering...: {}".format(self.name, e))
+                logger.debug(traceback.format_exc())
+            finally:
+                logger.debug("{}: Queue size: {}".format(self.name, self.queue.qsize()))
+                # just to be on the safe side of the gc
+                if pastie is not None:
+                    del(pastie)
+                    # signals to queue job is done
+                    self.queue.task_done()
+        logger.info('{}: exited'.format(self.name))
 
 class Pastie():
 
