@@ -45,6 +45,12 @@ class PastieSearch():
         self.h = None
         logger.debug("[{0}]: compiled into: {1}".format(self.search, self.re_search))
 
+    def __str__(self):
+        return self.to_text()
+
+    def __repr__(self):
+        return self.to_regex()
+
     def match(self, string):
         m = self.re_search.findall(string)
         if not m:

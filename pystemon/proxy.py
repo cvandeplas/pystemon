@@ -19,6 +19,9 @@ class ThreadProxyList(threading.Thread):
         self.condition = threading.Condition()
         self.kill_received = False
 
+    def __repr__(self):
+        return 'ThreadProxyList[{}]'.format(self.list.filename)
+
     def stop(self):
         with self.condition:
             logger.info('ThreadProxyList exiting')

@@ -81,6 +81,25 @@ class PastieSite(threading.Thread):
             self.pastie_class = None
         logger.debug("{}: initialized".format(self.name))
 
+    def __repr__(self):
+        return self.name
+
+    # implementing __eq__ means implementing also __hash__
+    def is_same_as(self, other):
+        res = False
+        try:
+            res = ( isinstance(other, PastieSite) and (self.name == other.name)
+                    and
+                    (self.download_url == other.download_url)
+                    and
+                    (self.archive_url == other.archive_url)
+                    and
+                    (self.metadata_url == self.metadata_url) )
+        except Exception as e:
+            logger.error("unable to compare PastieSite instances: {}".format(e))
+            pass
+        return res
+
     def stop(self):
         with self.condition:
             logger.info('{}: exiting'.format(self.name))

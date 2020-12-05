@@ -3,6 +3,11 @@ import yaml
 import importlib
 import threading
 
+try:
+    from queue import Queue
+except ImportError:
+    from Queue import Queue
+
 from pystemon.sendmail import PystemonSendmail
 from pystemon.storage import PastieStorage
 from pystemon.proxy import ProxyList
@@ -14,6 +19,7 @@ logger = logging.getLogger('pystemon')
 class SiteConfig():
     def __init__(self, name, config):
         self.name = name
+        self._queue = None
         self.download_url = config['download-url']
         self.archive_url = config['archive-url']
         self.archive_regex = config['archive-regex']
@@ -23,6 +29,51 @@ class SiteConfig():
         self.update_min = config.get('update-min', 10)
         self.update_max = config.get('update-max', 30)
         self.pastie_classname = config.get('pastie-classname')
+
+    @property
+    def queue(self):
+        if self._queue is None:
+            logger.debug("{}: initializing with empty Queue".format(repr(self)))
+            self._queue = Queue()
+        return self._queue
+
+    @queue.setter
+    def queue(self, q):
+        logger.debug("{}: inheriting queue of size={}".format(repr(self), q.qsize()))
+        self._queue = q
+
+    def __str__(self):
+        return '''SiteConfig[{}]:
+        download url: {}
+        archive url:  {}
+        public url:   {}
+        metadata url: {}
+        pastie class: {}
+        '''.format(self.name, self.download_url, self.archive_url,
+                self.public_url, self.metadata_url, self.pastie_classname)
+
+    def __repr__(self):
+        return "SiteConfig[{}]".format(self.name)
+
+    def __eq__(self, other):
+        res = False
+        try:
+            res = ( isinstance(other, SiteConfig) and (self.download_url == other.download_url)
+                    and
+                    (self.archive_url == other.archive_url)
+                    and
+                    (self.public_url == other.public_url)
+                    and
+                    (self.metadata_url == other.metadata_url)
+                    and
+                    (self.pastie_classname == other.pastie_classname) )
+        except Exception as e:
+            logger.error("Unable to compare SiteConfig instances: {}".format(e))
+            pass
+        return res
+
+    def __hash(self):
+        return self.name.__hash__()
 
 # TODO verify validity of all config parameters
 class PystemonConfig():
@@ -49,7 +100,7 @@ class PystemonConfig():
         self._max_throttling = 0
         self._preload()
 
-    def __eq__(self, other):
+    def is_same_as(self, other):
         # TODO check if config changed
         res = False
         try:
@@ -373,9 +424,19 @@ class PystemonConfig():
         for site in sites:
             if yamlconfig['site'][site].get('enable'):
                 logger.info("Site: {} is enabled, adding to pool...".format(site))
+                new_site = None
                 try:
                     count_enabled = count_enabled + 1
-                    sites_enabled.append(SiteConfig(site, yamlconfig['site'][site]))
+                    new_site = SiteConfig(site, yamlconfig['site'][site])
+                    if new_site in self._sites:
+                        i = self._sites.index(new_site)
+                        logger.debug("found {} in running configuration".format(repr(new_site)))
+                        current_site = self._sites[i]
+                        logger.debug("matching running site: {}".format(current_site))
+                        q = current_site.queue
+                        logger.debug("running queue size: {}".format(q.qsize()))
+                        new_site.queue = q
+                    sites_enabled.append(new_site)
                 except Exception as e:
                     logger.error("Unable to add site '{0}': {1}".format(site, e))
             elif yamlconfig['site'][site].get('enable') is False:

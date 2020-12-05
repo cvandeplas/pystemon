@@ -11,10 +11,6 @@ To be implemented:
 - FIXME validate parsing of config file
 '''
 
-try:
-    from queue import Queue
-except ImportError:
-    from Queue import Queue
 from datetime import datetime
 import logging.handlers
 import optparse
@@ -60,10 +56,9 @@ except Exception:
 def load_config(config):
 
     logger.debug("About to load configuration")
-
-    threads=[]
-    queues = {}
     config.reload()
+    threads=[]
+    sites_loaded=0
 
     if config.proxies_list is not None:
         threads.append(config.proxies_list.monitor())
@@ -106,18 +101,16 @@ def load_config(config):
                 threads.append(throttler)
                 throttler.setDaemon(True)
 
-            queues[site.name] = Queue()
-
             for i in range(config.threads):
                 name = "[ThreadPasties][{}][{}]".format(site.name, i+1)
                 user_agent = PystemonUA(name, config.proxies_list,
                         user_agents_list = config.user_agents_list,
                         throttler=throttler, ip_addr=config.ip_addr)
-                t = ThreadPasties(user_agent, queue_name=site.name, queue=queues[site.name])
+                t = ThreadPasties(user_agent, queue_name=site.name, queue=site.queue)
                 threads.append(t)
                 t.setDaemon(True)
 
-            # XXX compressed is used to guess the filename, so it's mandatory
+            # Compressed is used to guess the filename, so it's mandatory to pass it along
             name = "[PastieSite][{}]".format(site.name)
             site_ua=PystemonUA(name, config.proxies_list,
                 user_agents_list = config.user_agents_list,
@@ -132,17 +125,20 @@ def load_config(config):
                     site_archive_dir = config.archive_dir,
                     archive_compress = config.compress,
                     site_ua=site_ua,
-                    site_queue=queues[site.name],
+                    site_queue=site.queue,
                     patterns=config.patterns,
                     sendmail=config.sendmail,
                     re=config.re_module)
             t.set_storage(storage)
             threads.append(t)
             t.setDaemon(True)
+            sites_loaded = sites_loaded + 1
         except Exception as e:
             logger.error('Unable to initialize pastie site {0}: {1}'.format(site.name, e))
 
     logger.debug("Finished loading configuration, {} thread(s) to start".format(len(threads)))
+    if not sites_loaded > 0:
+        raise PystemonConfigEmpty("Resulting configuration ends up monitoring no site")
     return threads
 
 def start_threads(threads):

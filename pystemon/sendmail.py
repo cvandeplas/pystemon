@@ -28,24 +28,35 @@ class PystemonSendmail():
         self.password = password
         self.size_limit = size_limit
 
-    def __eq__(self, other):
-        return ((self.mailfrom == other.mailfrom)
-                and
-                (self.mailto == other.mailto)
-                and
-                (self.subject == other.subject)
-                and
-                (self.server == other.server)
-                and
-                (self.port == other.port)
-                and
-                (self.tls == other.tls)
-                and
-                (self.username == other.username)
-                and
-                (self.password == other.password)
-                and
-                (self.size_limit == other.size_limit))
+    def __repr__(self):
+        return 'PystemonSendmail[from={}][to={}]'.format(self.mailfrom, self.mailto)
+
+    def is_same_as(self, other):
+        res = False
+        try:
+            res = (isinstance(other, PystemonSendmail)
+                    and
+                    (self.mailfrom == other.mailfrom)
+                    and
+                    (self.mailto == other.mailto)
+                    and
+                    (self.subject == other.subject)
+                    and
+                    (self.server == other.server)
+                    and
+                    (self.port == other.port)
+                    and
+                    (self.tls == other.tls)
+                    and
+                    (self.username == other.username)
+                    and
+                    (self.password == other.password)
+                    and
+                    (self.size_limit == other.size_limit))
+        except Exception as e:
+            logger.error("Unable to compare PystemonSendmail instances: {}".format(e))
+            pass
+        return res
 
     def send_pastie_alert(self, pastie):
         msg = MIMEMultipart()

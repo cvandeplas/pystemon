@@ -16,10 +16,37 @@ class ThreadThrottler(threading.Thread):
     def __init__(self, site, throttling):
         threading.Thread.__init__(self)
         self.site = site
-        self.throttling = throttling
+        self._throttling = throttling
         self.queue = Queue()
         self.condition = threading.Condition()
         self.kill_received = False
+
+    def __repr__(self):
+        with self.condition:
+            return 'ThreadThrottler[{}][{}]'.format(self.site, self._throttling)
+
+    def is_same_as(self, other):
+        res = False
+        try:
+            res = ( isinstance(other, ThreadThrottler)
+                    and
+                    (self.site == other.site)
+                    and
+                    (self.throttling == other.throttling) )
+        except Exception as e:
+            logger.error("Unable to compare ThreadThrottler instances: {}".format(e))
+            pass
+        return res
+
+    @property
+    def throttling(self):
+        with self.condition:
+            return self._throttling
+
+    @throttling.setter
+    def throttling(self, throttling):
+        with self.condition:
+            self._throttling = throttling
 
     def stop(self):
         with self.condition:
@@ -37,8 +64,6 @@ class ThreadThrottler(threading.Thread):
         site = self.site
         logger.info('ThreadThrottler[{}] started'.format(site))
         queue = self.queue
-        throttling = self.throttling
-        sleeptime = throttling/float(1000)
         try:
             with self.condition:
                 while not self.kill_received:
@@ -46,6 +71,8 @@ class ThreadThrottler(threading.Thread):
                     consumer_lock = queue.get()
                     logger.debug("ThreadThrottler[{}]: releasing download request".format(site))
                     consumer_lock.set()
+                    queue.task_done()
+                    sleeptime = self._throttling/float(1000)
                     logger.debug("ThreadThrottler[{}]: now waiting {} second(s) ...".format(site, sleeptime))
                     self.condition.wait(sleeptime)
         except Exception as e:
@@ -56,6 +83,7 @@ class ThreadThrottler(threading.Thread):
             try:
                 consumer_lock = queue.get(block=False)
                 consumer_lock.set()
+                queue.task_done()
             except Empty:
                 break
             except Exception as e:

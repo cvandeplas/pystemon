@@ -5,6 +5,9 @@ class PystemonException(Exception):
 class PystemonConfigException(PystemonException):
     pass
 
+class PystemonConfigEmpty(PystemonConfigException):
+    pass
+
 class PystemonKillReceived(PystemonException):
     pass
 
