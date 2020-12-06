@@ -49,35 +49,47 @@ class StorageThread(threading.Thread, StorageScheduler):
         except Exception:
             size = 0
         self.queue = Queue(size)
+        self.condition = threading.Condition()
         self.kill_received = False
+
+    def stop(self):
+        with self.condition:
+            logger.info('{0}: stopping thread for saving pasties'.format(self.name))
+            self.kill_received = True
+            self.condition.notify_all()
 
     def run(self):
         logger.info('{0}: Thread for saving pasties started'.format(self.name))
-        # loop over the queue
-        while not self.kill_received:
-            # pastie = None
-            try:
-                # grabs pastie from queue
-                pastie = self.queue.get(True, 5)
-                # save the pasties in each storage
-                self.storage.save_pastie(pastie)
-            except Empty:
-                pass
-            # catch unknown errors
-            except Exception as e:
-                logger.error("{0}: Thread for saving pasties crashed unexpectectly, recovering...: {1}".format(self.name, e))
-                logger.debug(traceback.format_exc())
-            finally:
-                # to be on the safe side of gf
-                del(pastie)
-                # signals to queue job is done
-                self.queue.task_done()
+        with self.condition:
+            # loop over the queue
+            while not self.kill_received:
+                pastie = None
+                try:
+                    # grabs pastie from queue
+                    pastie = self.queue.get_nowait()
+                    # save the pasties in each storage
+                    self.storage.save_pastie(pastie)
+                except Empty:
+                    pass
+                # catch unknown errors
+                except Exception as e:
+                    logger.error("{0}: Thread for saving pasties crashed unexpectectly, recovering...: {1}".format(self.name, e))
+                    logger.debug(traceback.format_exc())
+                finally:
+                    if pastie is not None:
+                        # to be on the safe side of gf
+                        del(pastie)
+                        # signals to queue job is done
+                        self.queue.task_done()
+                self.condition.wait(1)
         logger.info('{0}: Thread for saving pasties terminated'.format(self.name))
 
     def save_pastie(self, pastie, timeout):
         try:
             logger.debug('{0}: queueing pastie {1} for saving'.format(self.name, pastie.id))
             self.queue.put(pastie, True, timeout)
+            with self.condition:
+                self.condition.notify_all()
         except Full:
             logger.error('{0}: unable to save pastie[{1}]: queue is full'.format(self.name, pastie.id))
 
