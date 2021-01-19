@@ -1,3 +1,4 @@
 PyYAML
 BeautifulSoup4
+lxml
 requests
