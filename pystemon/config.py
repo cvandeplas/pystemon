@@ -304,9 +304,9 @@ class PystemonConfig():
             if self._recent_pyyaml():
                 # https://github.com/yaml/pyyaml/wiki/PyYAML-yaml.load(input)-Deprecation
                 # only for 5.1+
-                yamlconfig = yaml.load(open(configfile), Loader=yaml.FullLoader)
+                yamlconfig = yaml.load(open(configfile), Loader=yaml.SafeLoader)
             else:
-                yamlconfig = yaml.load(open(configfile))
+                yamlconfig = yaml.safe_load(open(configfile))
         except yaml.YAMLError as exc:
             logger.error("Error in configuration file {0}:".format(configfile))
             if hasattr(exc, 'problem_mark'):
@@ -315,7 +315,7 @@ class PystemonConfig():
         for includes in yamlconfig.get("includes", []):
             try:
                 logger.debug("loading include '{0}'".format(includes))
-                yamlconfig.update(yaml.load(open(includes)))
+                yamlconfig.update(yaml.safe_load(open(includes)))
             except Exception as e:
                 raise PystemonConfigException("failed to load '{0}': {1}".format(includes, e))
         return yamlconfig
