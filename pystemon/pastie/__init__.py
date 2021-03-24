@@ -110,14 +110,14 @@ class Pastie():
             delta = self.fetch_end_time = time.time()
             if content is None:
                 logger.debug('failed to fetch pastie {id}'.format(id=self.id))
+            elif len(content) == 0:
+                self.pastie_content = None
+                logger.error('ERROR: Pastie size is 0B, ignoring {site} {id}'.format(
+                    site=self.site.name,
+                    id=self.id))
             else:
                 delta = self.fetch_end_time - self.fetch_start_time
                 logger.debug('fetched pastie {id}: {s}s, {b}B'.format(id=self.id, s=delta, b=len(content)))
-                if len(content) == 0: #Handle error where content is edited to 0 the thread will fail
-                    self.pastie_content = None
-                    logger.error('ERROR: Pastie size is 0B, ignoring {site} {id}'.format(
-                        site=self.site.name,
-                        id=self.id))
 
         except Exception as e:
             logger.error('ERROR: Failed to fetch pastie {site} {id}: {e}'.format(
