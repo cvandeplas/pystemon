@@ -56,12 +56,13 @@ class PystemonUA():
                     self.name, self.ip_addr, str(e)))
         return session
 
-    def __init__(self, name, proxies_list, user_agents_list = [],
+    def __init__(self, name, proxies_list, proxify_all=False, user_agents_list = [],
             retries_client=5, retries_server=100,
             throttler=None, ip_addr=None,
             connection_timeout=3.05, read_timeout=10):
         self.name = "user-agent"+name
         self.user_agents_list = user_agents_list
+        self.proxify_all = proxify_all
         self.proxies_list = proxies_list
         self.retries_client = retries_client
         self.retries_server = retries_server
@@ -86,7 +87,7 @@ class PystemonUA():
     def __parse_http__(self, url, session, random_proxy):
         logger.debug("{}: Parsing response for url '{}'".format(self.name, url))
         try:
-            response = session.get(url, stream=True, timeout=(self.connection_timeout, self.read_timeout))
+            response = session.get(url, stream=True, verify=False, timeout=(self.connection_timeout, self.read_timeout))
             response.raise_for_status()
             res = {'response': response}
         except HTTPError as e:
@@ -174,7 +175,7 @@ class PystemonUA():
         # do NOT try to download the url again here, as we might end in enless loop
         return res
 
-    def download_url(self, url, data=None, cookie=None, wait=0):
+    def download_url(self, url, use_proxy=False, data=None, cookie=None, wait=0):
         # let's not recurse where exceptions can raise exceptions can raise exceptions can...
         response = None
         loop_client = 0
@@ -189,10 +190,10 @@ class PystemonUA():
                     logger.debug("{}: download_url: permission to download granted".format(self.name))
                 session = self.get_bound_session()
                 random_proxy = None
-                if self.proxies_list:
+                if self.proxies_list and (self.proxify_all or use_proxy):
                     random_proxy = self.proxies_list.get_random_proxy()
                     if random_proxy:
-                        session.proxies = {'http': random_proxy}
+                        session.proxies = {'http': random_proxy, 'https': random_proxy}
                 user_agent = self.get_random_user_agent()
                 session.headers.update({'User-Agent': user_agent, 'Accept-Charset': 'utf-8'})
                 if cookie:

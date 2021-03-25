@@ -73,6 +73,7 @@ class Pastie():
         self.md5 = None
         self.url = self.site.download_url.format(id=self.id)
         self.public_url = self.site.public_url.format(id=self.id)
+        self.use_proxy = self.site.use_proxy
         self.metadata_url = None
         if self.site.metadata_url is not None:
             self.metadata_url = self.site.metadata_url.format(id=self.id)
@@ -92,11 +93,11 @@ class Pastie():
 
     def fetch_pastie(self):
         if self.metadata_url is not None:
-            response = self.download_url(self.metadata_url)
+            response = self.download_url(self.metadata_url, use_proxy=self.use_proxy)
             if response is not None:
                 response = response.content
                 self.pastie_metadata = response
-        response = self.download_url(self.url)
+        response = self.download_url(self.url, use_proxy=self.use_proxy)
         if response is not None:
             response = response.content
             self.pastie_content = response
