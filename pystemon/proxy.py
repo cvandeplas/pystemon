@@ -66,7 +66,6 @@ class ProxyList():
         else:
             t = ThreadProxyList(self, wait)
             t.setDaemon(True)
-            t.start()
             self.thread_proxy_list = t
         return self.thread_proxy_list
 
