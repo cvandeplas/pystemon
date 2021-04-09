@@ -40,3 +40,5 @@ RUN echo "\n===> Custom tuning...\n" && \
 
 # copy project
 COPY . /opt/pystemon
+
+ENTRYPOINT ["/opt/pystemon/pystemon.py"]
