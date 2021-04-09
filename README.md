@@ -45,3 +45,10 @@ Options:
 
 Default configuration file: /etc/pystemon.yaml or pystemon.yaml in current directory
 ``` 
+
+Docker
+------
+Render docker image with:
+```
+docker build -t cvandeplas/pystemon:latest .
+```
