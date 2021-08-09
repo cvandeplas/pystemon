@@ -85,7 +85,7 @@ class PystemonConfig():
         self._pidfile = None
         self._ip_addr = None
         self._sendmail = None
-        self._user_agents_list = None
+        self._user_agent = None
         self._storage_engines = None
         self._proxies_list = None
         self._re_module = None
@@ -150,9 +150,9 @@ class PystemonConfig():
             return self._sendmail
 
     @property
-    def user_agents_list(self):
+    def user_agent(self):
         with self.lock:
-            return self._user_agents_list
+            return self._user_agent
 
     @property
     def storage_engines(self):
@@ -203,7 +203,7 @@ class PystemonConfig():
                 self._ip_addr = config.get('ip_addr')
                 self._sendmail = config.get('sendmail')
                 self._save_thread = config.get('save_thread')
-                self._user_agents_list = config.get('user_agents_list')
+                self._user_agent = config.get('user_agent')
                 self._storage_engines = config.get('storage_engines')
                 self._save_dir = config.get('save_dir')
                 self._archive_dir = config.get('archive_dir')
@@ -247,11 +247,36 @@ class PystemonConfig():
         config['save_thread'] = yamlconfig.get('save-thread', False)
 
         uaconfig = yamlconfig.get('user-agent', {})
+        config['user_agent'] = {'list': None}
         if uaconfig.get('random', False):
             try:
-                config['user_agents_list'] = self._load_user_agents_from_file(yamlconfig['user-agent']['file'])
+                config['user_agent']['list'] = self._load_user_agents_from_file(yamlconfig['user-agent']['file'])
             except KeyError:
                 raise PystemonConfigException('random user-agent requested but no file provided')
+        try:
+            config['user_agent']['retries_client'] = int(uaconfig.get('retries-client', 5))
+            if config['user_agent']['retries_client'] < 0:
+                raise ValueError("negative value: {}".format(config['user_agent']['retries_client']))
+        except ValueError as e:
+            raise Exception("invalid retries-client value, must be a positive integer: {}".format(e))
+        try:
+            config['user_agent']['retries_server'] = int(uaconfig.get('retries-server', 100))
+            if config['user_agent']['retries_server'] < 0:
+                raise ValueError("negative value: {}".format(config['user_agent']['retries_server']))
+        except ValueError as e:
+            raise Exception("invalid retries-server value, must be a positive integer: {}".format(e))
+        try:
+            config['user_agent']['connection_timeout'] = float(uaconfig.get('connection-timeout', 3.05))
+            if config['user_agent']['connection_timeout'] < 0:
+                raise ValueError("negative value: {}".format(config['user_agent']['connection_timeout']))
+        except ValueError as e:
+            raise Exception("invalid connection_timeout value, must be a positive float: {}".format(e))
+        try:
+            config['user_agent']['read_timeout'] = float(uaconfig.get('read-timeout', 10))
+            if config['user_agent']['read_timeout'] < 0:
+                raise ValueError("negative value: {}".format(config['user_agent']['read_timeout']))
+        except ValueError as e:
+            raise Exception("invalid read-timeout value, must be a positive float: {}".format(e))
 
         try:
             ip_addr = yamlconfig['network']['ip']
