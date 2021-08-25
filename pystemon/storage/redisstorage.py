@@ -28,7 +28,7 @@ class RedisStorage(PastieStorage):
         for directory in directories:
             if directory is None:
                 continue
-            directory = directory + os.sep + pastie.site.name
+            directory = directory + os.sep + pastie.site.site
             full_path = self.format_directory(directory) + os.sep + pastie.filename
             if pastie.matched or self.save_all:
                 self.__getconn().lpush('pastes', full_path)
