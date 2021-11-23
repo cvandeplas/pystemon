@@ -17,7 +17,7 @@ class Sqlite3Storage(PastieStorage):
         except KeyError:
             logger.debug('Re-opening Sqlite database {0} in thread[{1}]'.format(self.filename, thread_id))
             # autocommit and write ahead logging
-            # works well because we have only 1 writter for n readers
+            # works well because we have only 1 writer for n readers
             db_conn = sqlite3.connect(self.filename, isolation_level=None)
             db_conn.execute('pragma journal_mode=wal')
             cursor = db_conn.cursor()
