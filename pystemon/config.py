@@ -400,7 +400,7 @@ class PystemonConfig():
             re_module=importlib.import_module(engine)
             if engine == 'regex':
                 logger.debug("Setting regex DEFAULT_VERSION to VERSION1")
-                re_module.DEFAULT_VERSION = re.VERSION1
+                re_module.DEFAULT_VERSION = re_module.VERSION1
         except ImportError as e:
             raise PystemonConfigException("unable to import module '{0}'".format(engine))
         return re_module

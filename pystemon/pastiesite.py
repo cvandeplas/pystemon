@@ -20,6 +20,7 @@ class PastieSite(threading.Thread):
     def __init__(self, name, download_url, archive_url, archive_regex, **kwargs):
 
         threading.Thread.__init__(self)
+        self.site = name
         self.name = "PastieSite[{}]".format(name)
         logger.debug("{}: initializing ...".format(self.name))
 
@@ -37,6 +38,7 @@ class PastieSite(threading.Thread):
                 self.save_dir = site_save_dir  + os.sep + name
                 logger.debug("{}: pasties will be saved in '{}'".format(self.name, self.save_dir))
                 if not os.path.exists(self.save_dir):
+                    logger.debug("{}: creating directory '{}' ...".format(self.name, self.save_dir))
                     os.makedirs(self.save_dir)
         except KeyError:
             pass
@@ -47,6 +49,7 @@ class PastieSite(threading.Thread):
                 self.archive_dir = site_archive_dir + os.sep + name
                 logger.debug("{}: pasties will be archived in '{}'".format(self.name, self.archive_dir))
                 if not os.path.exists(self.archive_dir):
+                    logger.debug("{}: creating directory '{}' ...".format(self.name, self.archive_dir))
                     os.makedirs(self.archive_dir)
         except KeyError:
             pass
@@ -213,6 +216,7 @@ class PastieSite(threading.Thread):
         if self.seen_pastie(pastie_id,
                             url=self.public_url.format(id=pastie_id),
                             sitename=self.name,
+                            site=self.site,
                             filename=self.pastie_id_to_filename(pastie_id)):
             return True
         # We have not yet seen the pastie.

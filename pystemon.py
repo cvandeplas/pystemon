@@ -86,7 +86,7 @@ def load_config(config):
     '''
      for each site enabled:
      - get the configuration
-     - if successfull, create a queue
+     - if successful, create a queue
      - create a thread to refresh the list of pasties to download (consumer)
      - create a thread to download the pasties (consumer)
      - if needed, create a thread to throttle all the other threads (producer)
