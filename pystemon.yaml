@@ -206,6 +206,13 @@ site:
     archive-regex: '<td><a href="(\d+)" title='
     download-url: 'http://pastebin.gr/paste.php?download&id={id}'
     throttling: 5000
+    
+  pastebin.pl:
+    enable: no
+    archive-url: 'https://pastebin.pl/lists'
+    archive-regex: '<td class="first"><a href="https://pastebin.pl/view/(\w+)">'
+    download-url: 'https://pastebin.pl/view/download/{id}'
+    throttling: 5000
 
   # Exercise related sites
   # this is site related to the LockedShields Cyber exercise.
