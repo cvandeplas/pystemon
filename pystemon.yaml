@@ -58,8 +58,10 @@ storage:
   telegram:
     storage-classname:    TelegramStorage
     enable: no            # Enable this alerting engine
+    save: yes
     token: 0              # see https://core.telegram.org/bots/api#authorizing-your-bot
-    chat-id: 0
+    chat-ids:
+      - 0
 
 email:
   alert: no             # Enable/disable email alerts
@@ -178,7 +180,7 @@ site:
     download-url: 'http://paste.org.ru/?{id}'
     pastie-classname: PastiePasteOrgRu
     throttling: 5000
- 
+
   kpaste.net:
     enable: no
     archive-url: 'http://kpaste.net/'
@@ -206,7 +208,7 @@ site:
     archive-regex: '<td><a href="(\d+)" title='
     download-url: 'http://pastebin.gr/paste.php?download&id={id}'
     throttling: 5000
-    
+
   pastebin.pl:
     enable: no
     archive-url: 'https://pastebin.pl/lists'
