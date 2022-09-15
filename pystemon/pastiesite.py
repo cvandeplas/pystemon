@@ -59,6 +59,7 @@ class PastieSite(threading.Thread):
         if kwargs['site_metadata_url'] is not None:
             self.metadata_url = kwargs['site_metadata_url']
 
+        self.use_proxy = kwargs.get('site_use_proxy', False)
         self.archive_compress = kwargs.get('archive_compress', False)
         self.update_min = kwargs['site_update_min']
         self.update_max = kwargs['site_update_max']
@@ -167,7 +168,7 @@ class PastieSite(threading.Thread):
         # reset the pasties list
         pasties = []
         # populate queue with data
-        response = self.user_agent.download_url(self.archive_url)
+        response = self.user_agent.download_url(self.archive_url, use_proxy=self.use_proxy)
         if not response:
             logger.warning("Failed to download page {url}".format(url=self.archive_url))
             return False

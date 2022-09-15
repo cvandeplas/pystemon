@@ -28,6 +28,7 @@ class SiteConfig():
         self.metadata_url = config.get('metadata-url')
         self.update_min = config.get('update-min', 10)
         self.update_max = config.get('update-max', 30)
+        self.use_proxy = config.get('use-proxy', False)
         self.pastie_classname = config.get('pastie-classname')
 
     @property
@@ -160,6 +161,11 @@ class PystemonConfig():
             return self._storage_engines
 
     @property
+    def proxify_all(self):
+        with self.lock:
+            return self._proxify_all
+
+    @property
     def proxies_list(self):
         with self.lock:
             return self._proxies_list
@@ -208,6 +214,7 @@ class PystemonConfig():
                 self._save_dir = config.get('save_dir')
                 self._archive_dir = config.get('archive_dir')
                 self._compress = config.get('compress')
+                self._proxify_all = config.get('proxify_all')
                 self._proxies_list = config.get('proxies_list')
                 self._re_module = config.get('re_module')
                 self._patterns = config.get('patterns')
@@ -238,11 +245,11 @@ class PystemonConfig():
         logger.debug("parsing yaml configuration from file '{}'".format(self._configfile))
         config = {}
         yamlconfig = self._yamlconfig
-        try:
-            if yamlconfig['proxy']['random']:
-                config['proxies_list'] = ProxyList(yamlconfig['proxy']['file'])
-        except KeyError:
-            pass
+
+        proxyconfig = yamlconfig.get('proxy', {})
+        config['proxify_all'] = proxyconfig.get('random', False)
+        if config['proxify_all']:
+            config['proxies_list'] = ProxyList(yamlconfig['proxy']['file'])
 
         config['save_thread'] = yamlconfig.get('save-thread', False)
 
@@ -277,6 +284,13 @@ class PystemonConfig():
             pass
 
         config['sites'] = self._load_sites(yamlconfig)
+
+        if not "proxies_list" in config:
+            for site in config['sites']:
+                if site.use_proxy:
+                    logger.debug("site {0} found with use-proxy directive, getting proxies list".format(site.name))
+                    config['proxies_list'] = ProxyList(yamlconfig['proxy']['file'])
+                    break
 
         if not self.debug and 'logging-level' in yamlconfig:
             if yamlconfig['logging-level'] in ['NOTSET', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
