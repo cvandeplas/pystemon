@@ -305,3 +305,8 @@ proxy:
 user-agent:
   random: yes
   file: 'user-agents.txt'
+  retries-client: 5
+  retries-server: 100
+  connection-timeout: 3.05
+  read-timeout: 10
+

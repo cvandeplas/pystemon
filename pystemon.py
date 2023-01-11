@@ -104,7 +104,11 @@ def load_config(config):
             for i in range(config.threads):
                 name = "[ThreadPasties][{}][{}]".format(site.name, i+1)
                 user_agent = PystemonUA(name, config.proxies_list,
-                        user_agents_list = config.user_agents_list,
+                        user_agents_list = config.user_agent['list'],
+                        retries_client=config.user_agent['retries_client'],
+                        retries_server=config.user_agent['retries_server'],
+                        connection_timeout=config.user_agent['connection_timeout'],
+                        read_timeout=config.user_agent['read_timeout'],
                         throttler=throttler, ip_addr=config.ip_addr)
                 t = ThreadPasties(user_agent, queue_name=site.name, queue=site.queue)
                 threads.append(t)
@@ -113,7 +117,11 @@ def load_config(config):
             # Compressed is used to guess the filename, so it's mandatory to pass it along
             name = "[PastieSite][{}]".format(site.name)
             site_ua=PystemonUA(name, config.proxies_list,
-                user_agents_list = config.user_agents_list,
+                user_agents_list = config.user_agent['list'],
+                retries_client=config.user_agent['retries_client'],
+                retries_server=config.user_agent['retries_server'],
+                connection_timeout=config.user_agent['connection_timeout'],
+                read_timeout=config.user_agent['read_timeout'],
                 throttler = throttler, ip_addr = config.ip_addr)
             t = PastieSite(site.name, site.download_url, site.archive_url, site.archive_regex,
                     site_public_url = site.public_url,
